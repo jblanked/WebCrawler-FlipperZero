@@ -1,0 +1,17 @@
+App(
+    appid="web_crawler",
+    name="Web Crawler",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="web_crawler_app",
+    stack_size=4 * 1024,
+    requires=[
+        "gui", 
+    ],
+    order=10,
+    fap_version = (0, 1),
+    fap_icon="app.png",
+    fap_category="GPIO",
+    fap_author="JBlanked",
+    fap_icon_assets="assets",
+    fap_description="Use Wifi to access the internet and web scrape",
+)
