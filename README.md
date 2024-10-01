@@ -71,6 +71,5 @@ The Web Crawler app utilizes logging to help identify issues:
 
 Connect your Flipper Zero to a computer and use a serial terminal to view these logs for detailed troubleshooting.
 
----
 
 *Happy Crawling! 🕷️*
