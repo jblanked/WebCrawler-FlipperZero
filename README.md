@@ -13,7 +13,7 @@
 
 1. **Launch the Web Crawler App**
 
-   Navigate to the `Apps` menu on your Flipper Zero, select `GPIO`, then scroll down and select **Web Crawler**.
+   Navigate to the Apps menu on your Flipper Zero, select GPIO, then scroll down and select **Web Crawler**.
 
 2. **Main Menu**
 
@@ -45,12 +45,12 @@
 
 5. **Accessing Crawled Data**
 
-   After the crawling operation completes, navigate to the storage directory to access the `received_data.txt` file, which contains the crawled information.
+   After the crawling operation completes, navigate to the storage directory to access the received_data.txt file, which contains the crawled information.
 
 ## Setting Up Parameters
 
 1. **Path (URL)**
-   - Enter the complete URL of the website you intend to crawl (e.g., `https://www.example.com/`).
+   - Enter the complete URL of the website you intend to crawl (e.g., https://www.example.com/).
 
 2. **SSID (Wi-Fi Network)**
    - Provide the name of your Wi-Fi network to enable the Flipper Zero to communicate over the network if required.
