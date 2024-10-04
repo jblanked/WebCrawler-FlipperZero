@@ -65,15 +65,11 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                 canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
                 already_success = true;
             }
-            else if (get_success && fhttp.state == IDLE && fhttp.received_data == NULL && already_success)
+            else if (get_success && fhttp.state == IDLE)
             {
                 already_success = true;
                 canvas_draw_str(canvas, 0, 10, "Data saved to file.");
                 canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
-            }
-            else if (get_success && fhttp.state == IDLE && fhttp.received_data == NULL && !already_success)
-            {
-                canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
             }
             else
             {

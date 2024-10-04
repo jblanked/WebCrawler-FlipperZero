@@ -468,17 +468,20 @@ void flipper_http_rx_callback(const char *line, void *context)
             if (fhttp.received_data)
             {
                 strcpy(fhttp.received_data, line);
-                strcat(fhttp.received_data, "\n");
+                fhttp.received_data[strlen(line)] = '\n';     // Add newline
+                fhttp.received_data[strlen(line) + 1] = '\0'; // Null terminator
             }
         }
         else
         {
-            size_t new_size = strlen(fhttp.received_data) + strlen(line) + 2; // +2 for newline and null terminator
+            size_t current_len = strlen(fhttp.received_data);
+            size_t new_size = current_len + strlen(line) + 2; // +2 for newline and null terminator
             fhttp.received_data = (char *)realloc(fhttp.received_data, new_size);
             if (fhttp.received_data)
             {
-                strcat(fhttp.received_data, line);
-                strcat(fhttp.received_data, "\n");
+                memcpy(fhttp.received_data + current_len, line, strlen(line)); // Copy line at the end of the current data
+                fhttp.received_data[current_len + strlen(line)] = '\n';        // Add newline
+                fhttp.received_data[current_len + strlen(line) + 1] = '\0';    // Null terminator
             }
         }
 

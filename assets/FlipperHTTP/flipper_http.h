@@ -23,6 +23,8 @@ void flipper_http_rx_callback(const char *line, void *context);
 // Function to save received data to a file
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[]);
 
+static bool flipper_http_connect_wifi();
+
 // Define GPIO pins for UART
 GpioPin test_pins[2] = {
     {.port = GPIOA, .pin = LL_GPIO_PIN_7}, // USART1_RX
@@ -364,7 +366,7 @@ bool flipper_http_disconnect_wifi()
 }
 
 // Function to connect to WiFi (returns true if successful)
-bool flipper_http_connect_wifi()
+static bool flipper_http_connect_wifi()
 {
     const char *command = "[WIFI/CONNECT]";
     if (!flipper_http_send_data(command))
