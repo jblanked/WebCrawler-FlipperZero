@@ -8,18 +8,21 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 4. Click on the File-Opener.
 5. Naviate to `SD Card/apps_data/esp_flasher/
 6. Drag all three bin files (or the entire folder) into the directory.
-7. Disconnect your Flipper Zero from your computer.
+7. Disconnect your Flipper Zero from your computer and turn it off.
 8. Plug your Wi-Fi Devboard into the Flipper.
-9. Press and keep holding the boot button while you press the reset button once, release the boot button after 2 seconds.
-10. Open the ESP Flasher app on your Flipper Zero, it should be located under `Apps->GPIO` from the main menu. If not, download it from the Flipper App Store.
+9. Open the ESP Flasher app on your Flipper Zero, it should be located under `Apps->GPIO` from the main menu. If not, download it from the Flipper App Store.
+10. In the ESP Flasher app, select the following options:
+    - "Reset Board": wait a few seconds, then go back.
+    - "Enter Bootloader": wait until the 'waiting for download' message appears, then go back.
 11. Click on Manual Flash.
 12. Click on Bootloader and select the `flipper_http_bootloader.bin` that you downloaded earlier.
 13. Click on Part Table and select the `flipper_http_partitions.bin` that you downloaded earlier.
 14. Click on FirmwareA and select the `flipper_http_firmware_a.bin` that you downloaded earlier.
-15. Click on FLASH - fast and follow the instructions on the screen.
-16. Now you are all set to use the Web Crawler app.
+15. Click on FLASH - slow. If successful, you will see three green LED blinks.
+16. On the Developer Board, press the RESET button once.
+17. You are all set.
 
-Guide: https://www.youtube.com/watch?v=Y2lUVTMTABE&t=19s
+Initial Guide: https://www.youtube.com/watch?v=Y2lUVTMTABE&t=19s
 
 
 # Usage
