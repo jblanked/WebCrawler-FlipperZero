@@ -3,10 +3,10 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 
 ## Installation
 1. Download the `flipper_http_bootloader.bin`, `flipper_http_firmware_a.bin`, and `flipper_http_partitions.bin` files.
-2. Connect your Flipper Zero to your computer.
+2. Unplug your Wifi Dev Board and connect your Flipper Zero to your computer.
 3. Open up qFlipper.
-4. Click on the File-Opener.
-5. Naviate to `SD Card/apps_data/esp_flasher/
+4. Click on the `File manager`.
+5. Naviate to `SD Card/apps_data/esp_flasher/`
 6. Drag all three bin files (or the entire folder) into the directory.
 7. Disconnect your Flipper Zero from your computer and turn it off.
 8. Plug your Wi-Fi Devboard into the Flipper.
@@ -18,11 +18,10 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 12. Click on Bootloader and select the `flipper_http_bootloader.bin` that you downloaded earlier.
 13. Click on Part Table and select the `flipper_http_partitions.bin` that you downloaded earlier.
 14. Click on FirmwareA and select the `flipper_http_firmware_a.bin` that you downloaded earlier.
-15. Click on FLASH - slow. If successful, you will see three green LED blinks.
-16. On the Developer Board, press the RESET button once.
-17. You are all set.
+15. Click on FLASH - slow. If successful, you will see three green LED blinks on the Dev board.
+16. On the Dev Board, press the RESET button once.
 
-Initial Guide: https://www.youtube.com/watch?v=Y2lUVTMTABE&t=19s
+You should be all set. Here's the initial guide: https://www.youtube.com/watch?v=Y2lUVTMTABE
 
 
 # Usage
