@@ -8,9 +8,9 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 4. Click on the `File manager`.
 5. Naviate to `SD Card/apps_data/esp_flasher/`
 6. Drag all three bin files (or the entire folder) into the directory.
-7. Disconnect your Flipper Zero from your computer and turn it off.
-8. Plug your Wi-Fi Devboard into the Flipper.
-9. Open the ESP Flasher app on your Flipper Zero, it should be located under `Apps->GPIO` from the main menu. If not, download it from the Flipper App Store.
+7. Disconnect your Flipper from your computer then turn off your Flipper.
+8. Plug your Wi-Fi Devboard into the Flipper then turn on your Flipper.
+9. Open the ESP Flasher app on your Flipper, it should be located under `Apps->GPIO` from the main menu. If not, download it from the Flipper App Store.
 10. In the ESP Flasher app, select the following options:
     - "Reset Board": wait a few seconds, then go back.
     - "Enter Bootloader": wait until the 'waiting for download' message appears, then go back.
@@ -25,7 +25,7 @@ You should be all set. Here's the initial guide: https://www.youtube.com/watch?v
 
 
 # Usage
-The `flipper_http.h` file is for seamless use of the FlipperHTTp Firmware in `C` applications and is the root of the `Web Crawler` app. A Javascript library will be available soon, followed by a mPython library.
+The `flipper_http.h` file is for seamless use of the FlipperHTTP Firmware in `C` applications and is the root of the `Web Crawler` app. A Javascript library will be available soon, followed by a mPython library.
 
 ## General
 - Init:
