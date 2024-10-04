@@ -1,19 +1,120 @@
-// Define the GPIO pins available on the Flipper Zero
-GpioPin test_pins[9] = {
-    {.port = GPIOA, .pin = LL_GPIO_PIN_7}, // PB7 - USART1_RX
-    {.port = GPIOA, .pin = LL_GPIO_PIN_6}, // PB6 - USART1_TX
-    {.port = GPIOA, .pin = LL_GPIO_PIN_5},
-    {.port = GPIOA, .pin = LL_GPIO_PIN_4},
-    {.port = GPIOB, .pin = LL_GPIO_PIN_3},
-    {.port = GPIOB, .pin = LL_GPIO_PIN_2},
-    {.port = GPIOC, .pin = LL_GPIO_PIN_3},
-    {.port = GPIOC, .pin = LL_GPIO_PIN_1},
-    {.port = GPIOC, .pin = LL_GPIO_PIN_0}};
+// web_crawler_callback.h
+static bool sent_get_request = false;
+static bool get_success = false;
+static bool already_success = false;
+static WebCrawlerApp *app_instance = NULL;
 
 // Forward declaration of callback functions
 static void web_crawler_setting_item_path_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_password_clicked(void *context, uint32_t index);
+
+static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
+{
+    UNUSED(context);
+
+    WebCrawlerApp *app = app_instance;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "App is NULL");
+        return;
+    }
+
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontSecondary);
+
+    if (fhttp.state == INACTIVE)
+    {
+        canvas_draw_str(canvas, 0, 7, "Wifi Dev Board disconnected.");
+        canvas_draw_str(canvas, 0, 17, "Please connect to the board.");
+        canvas_draw_str(canvas, 0, 32, "If you board is connected,");
+        canvas_draw_str(canvas, 0, 42, "make sure you have flashed");
+        canvas_draw_str(canvas, 0, 52, "your Dev Board with the");
+        canvas_draw_str(canvas, 0, 62, "FlipperHTTP firmware.");
+        return;
+    }
+
+    if (app->path)
+    {
+        if (!sent_get_request)
+        {
+
+            canvas_draw_str(canvas, 0, 10, "Sending GET request...");
+
+            // Perform GET request and handle the response
+            get_success = flipper_http_get_request(app->path);
+
+            canvas_draw_str(canvas, 0, 20, "Sent!");
+
+            if (get_success)
+            {
+                canvas_draw_str(canvas, 0, 30, "Receiving data...");
+                get_success = true;
+            }
+            else
+            {
+                canvas_draw_str(canvas, 0, 30, "Failed.");
+            }
+
+            sent_get_request = true;
+        }
+        else
+        {
+            if (get_success && fhttp.state == RECEIVING)
+            {
+                canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
+                already_success = true;
+            }
+            else if (get_success && fhttp.state == IDLE && fhttp.received_data == NULL && already_success)
+            {
+                already_success = true;
+                canvas_draw_str(canvas, 0, 10, "Data saved to file.");
+                canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
+            }
+            else if (get_success && fhttp.state == IDLE && fhttp.received_data == NULL && !already_success)
+            {
+                canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
+            }
+            else
+            {
+                if (fhttp.state == ISSUE)
+                {
+                    if (strstr(fhttp.last_response, "[ERROR] Not connected to Wifi. Failed to reconnect.") != NULL)
+                    {
+                        canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
+                        canvas_draw_str(canvas, 0, 50, "Update your config settings.");
+                        canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
+                    }
+                    else if (strstr(fhttp.last_response, "[ERROR] Failed to connect to Wifi.") != NULL)
+                    {
+                        canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
+                        canvas_draw_str(canvas, 0, 50, "Update your config settings.");
+                        canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
+                    }
+                    else
+                    {
+                        canvas_draw_str(canvas, 0, 10, "[ERROR] Failed to sync data.");
+                        canvas_draw_str(canvas, 0, 30, "If this is your third attempt,");
+                        canvas_draw_str(canvas, 0, 40, "it's likely your URL is not");
+                        canvas_draw_str(canvas, 0, 50, "compabilbe or correct.");
+                        canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
+                    }
+                }
+                else
+                {
+                    canvas_draw_str(canvas, 0, 10, "GET request failed.");
+                    canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
+                }
+                get_success = false;
+            }
+        }
+    }
+    else
+    {
+        canvas_draw_str(canvas, 0, 10, "URL not set.");
+    }
+}
+
 /**
  * @brief      Navigation callback to handle exiting from other views to the submenu.
  * @param      context   The context - WebCrawlerApp object.
@@ -22,6 +123,13 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
 static uint32_t web_crawler_back_to_main_callback(void *context)
 {
     UNUSED(context);
+    sent_get_request = false;
+    get_success = false;
+    already_success = false;
+    if (app_instance && app_instance->textbox)
+    {
+        widget_reset(app_instance->textbox);
+    }
     return WebCrawlerViewSubmenu; // Return to the main submenu view
 }
 
@@ -44,7 +152,7 @@ static uint32_t web_crawler_back_to_configure_callback(void *context)
 static uint32_t web_crawler_exit_app_callback(void *context)
 {
     UNUSED(context);
-    return VIEW_NONE; // Exit the app
+    return VIEW_NONE;
 }
 
 /**
@@ -55,17 +163,34 @@ static uint32_t web_crawler_exit_app_callback(void *context)
 static void web_crawler_submenu_callback(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app);
     switch (index)
     {
     case WebCrawlerSubmenuIndexRun:
-        // Switch to the main view where the saved path will be displayed
-        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewMain);
+        sent_get_request = false; // Reset the flag
+        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewRun);
         break;
     case WebCrawlerSubmenuIndexAbout:
         view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewAbout);
         break;
     case WebCrawlerSubmenuIndexSetPath:
         view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
+        break;
+    case WebCrawlerSubmenuIndexData:
+        if (!load_received_data())
+        {
+            if (app_instance->textbox)
+            {
+                widget_reset(app_instance->textbox);
+                widget_add_text_scroll_element(
+                    app_instance->textbox,
+                    0,
+                    0,
+                    128,
+                    64, "File is empty.");
+            }
+        }
+        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewData);
         break;
     default:
         FURI_LOG_E(TAG, "Unknown submenu index");
@@ -97,68 +222,6 @@ static void web_crawler_config_enter_callback(void *context, uint32_t index)
     }
 }
 
-// At the top of your file, after includes and defines
-static WebCrawlerApp *app_instance = NULL;
-
-// Modify the draw callback function to match the expected signature
-static void web_crawler_view_draw_callback(Canvas *canvas, void *model)
-{
-    WebCrawlerMainModel *main_model = (WebCrawlerMainModel *)model; // Cast model to WebCrawlerMainModel
-    canvas_clear(canvas);
-    canvas_set_font(canvas, FontPrimary);
-
-    if (main_model->path[0] != '\0')
-    {
-        canvas_draw_str(canvas, 1, 10, "Sending GET request...");
-
-        // Initialize the GPIO pin for output mode
-        furi_hal_gpio_init_simple(&test_pins[1], GpioModeOutputPushPull);
-
-        // Set GPIO pin high
-        furi_hal_gpio_write(&test_pins[1], true);
-
-        canvas_draw_str(canvas, 1, 20, "Sending Wifi settings..");
-
-        // Send settings via UART
-        send_settings_via_uart(main_model->path, main_model->ssid, main_model->password);
-
-        furi_delay_ms(1000); // Delay for 1 second
-
-        // Read data from UART sent by the dev board
-        if (read_data_from_uart_and_save(canvas))
-        {
-            furi_hal_gpio_write(&test_pins[1], false); // Set GPIO pin low
-            canvas_draw_str(canvas, 1, 80, "Data received and saved");
-
-            // Switch back to submenu view
-            if (app_instance)
-            {
-                view_dispatcher_switch_to_view(app_instance->view_dispatcher, WebCrawlerViewSubmenu);
-            }
-        }
-        else
-        {
-            furi_hal_gpio_write(&test_pins[1], false); // Set GPIO pin low
-        }
-    }
-    else
-    {
-        canvas_draw_str(canvas, 1, 10, "No path saved.");
-    }
-}
-/**
- * @brief      Input callback for the main screen.
- * @param      event    The input event.
- * @param      context  The context - WebCrawlerApp object.
- * @return     true if the event was handled, false otherwise.
- */
-static bool web_crawler_view_input_callback(InputEvent *event, void *context)
-{
-    UNUSED(event);
-    UNUSED(context);
-    return false;
-}
-
 /**
  * @brief      Callback for when the user finishes entering the URL.
  * @param      context   The context - WebCrawlerApp object.
@@ -167,11 +230,10 @@ static void web_crawler_set_path_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
 
+    furi_check(app);
+
     // Store the entered URL from temp_buffer_path to path
     strncpy(app->path, app->temp_buffer_path, app->temp_buffer_size_path - 1);
-
-    // Ensure null-termination
-    app->path[app->temp_buffer_size_path - 1] = '\0';
 
     if (app->path_item)
     {
@@ -180,15 +242,14 @@ static void web_crawler_set_path_updated(void *context)
         // Save the URL to the settings
         save_settings(app->path, app->ssid, app->password);
 
-        FURI_LOG_D(TAG, "URL saved: %s", app->path);
-    }
+        // send to UART
+        if (!flipper_http_save_wifi(app->ssid, app->password))
+        {
+            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
+            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+        }
 
-    // Update the main view's model
-    WebCrawlerMainModel *main_model = (WebCrawlerMainModel *)view_get_model(app->view_main);
-    if (main_model)
-    {
-        strncpy(main_model->path, app->path, sizeof(main_model->path) - 1);
-        main_model->path[sizeof(main_model->path) - 1] = '\0';
+        FURI_LOG_D(TAG, "URL saved: %s", app->path);
     }
 
     // Return to the Configure view
@@ -202,12 +263,9 @@ static void web_crawler_set_path_updated(void *context)
 static void web_crawler_set_ssid_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-
+    furi_check(app);
     // Store the entered SSID from temp_buffer_ssid to ssid
     strncpy(app->ssid, app->temp_buffer_ssid, app->temp_buffer_size_ssid - 1);
-
-    // Ensure null-termination
-    app->ssid[app->temp_buffer_size_ssid - 1] = '\0';
 
     if (app->ssid_item)
     {
@@ -216,16 +274,16 @@ static void web_crawler_set_ssid_updated(void *context)
         // Save the SSID to the settings
         save_settings(app->path, app->ssid, app->password);
 
+        // send to UART
+        if (!flipper_http_save_wifi(app->ssid, app->password))
+        {
+            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
+            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+        }
+
         FURI_LOG_D(TAG, "SSID saved: %s", app->ssid);
     }
 
-    // Update the main view's model
-    WebCrawlerMainModel *main_model = (WebCrawlerMainModel *)view_get_model(app->view_main);
-    if (main_model)
-    {
-        strncpy(main_model->ssid, app->ssid, sizeof(main_model->ssid) - 1);
-        main_model->ssid[sizeof(main_model->ssid) - 1] = '\0';
-    }
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
 }
@@ -237,12 +295,9 @@ static void web_crawler_set_ssid_updated(void *context)
 static void web_crawler_set_password_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-
+    furi_check(app);
     // Store the entered Password from temp_buffer_password to password
     strncpy(app->password, app->temp_buffer_password, app->temp_buffer_size_password - 1);
-
-    // Ensure null-termination
-    app->password[app->temp_buffer_size_password - 1] = '\0';
 
     if (app->password_item)
     {
@@ -251,16 +306,16 @@ static void web_crawler_set_password_update(void *context)
         // Save the Password to the settings
         save_settings(app->path, app->ssid, app->password);
 
+        // send to UART
+        if (!flipper_http_save_wifi(app->ssid, app->password))
+        {
+            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
+            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+        }
+
         FURI_LOG_D(TAG, "Password saved: %s", app->password);
     }
 
-    // Update the main view's model
-    WebCrawlerMainModel *main_model = (WebCrawlerMainModel *)view_get_model(app->view_main);
-    if (main_model)
-    {
-        strncpy(main_model->password, app->password, sizeof(main_model->password) - 1);
-        main_model->password[sizeof(main_model->password) - 1] = '\0';
-    }
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
 }
@@ -273,13 +328,21 @@ static void web_crawler_set_password_update(void *context)
 static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app);
     UNUSED(index);
-
     // Set up the text input
     text_input_set_header_text(app->text_input_path, "Enter URL");
 
     // Initialize temp_buffer with existing path
-    strncpy(app->temp_buffer_path, "https://www.x.com/", app->temp_buffer_size_path - 1);
+    if (app->path)
+    {
+        strncpy(app->temp_buffer_path, app->path, app->temp_buffer_size_path - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_path, "https://www.google.com/", app->temp_buffer_size_path - 1);
+    }
+
     app->temp_buffer_path[app->temp_buffer_size_path - 1] = '\0';
 
     // Configure the text input
@@ -309,13 +372,21 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app);
     UNUSED(index);
-
     // Set up the text input
     text_input_set_header_text(app->text_input_ssid, "Enter SSID");
 
     // Initialize temp_buffer with existing SSID
-    strncpy(app->temp_buffer_ssid, app->ssid, app->temp_buffer_size_ssid - 1);
+    if (app->ssid)
+    {
+        strncpy(app->temp_buffer_ssid, app->ssid, app->temp_buffer_size_ssid - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_ssid, "SSID-2G-", app->temp_buffer_size_ssid - 1);
+    }
+
     app->temp_buffer_ssid[app->temp_buffer_size_ssid - 1] = '\0';
 
     // Configure the text input
@@ -345,8 +416,8 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 static void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app);
     UNUSED(index);
-
     // Set up the text input
     text_input_set_header_text(app->text_input_password, "Enter Password");
 
