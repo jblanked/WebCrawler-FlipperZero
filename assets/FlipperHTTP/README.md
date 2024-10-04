@@ -48,3 +48,7 @@ The `flipper_http.h` file is for seamless use of the FlipperHTTP Firmware in `C`
     - `flipper_http_send_data(const char *data)`
 - Rx Callback:
     - `flipper_http_rx_callback(const char *line, void *context)`
+- GET request:
+    - `flipper_http_get_request(const char *url)`
+- Save Data to SD:
+    - `flipper_http_save_received_data(size_t bytes_received, const char line_buffer[])`
