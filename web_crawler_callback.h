@@ -85,13 +85,13 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                     if (strstr(fhttp.last_response, "[ERROR] Not connected to Wifi. Failed to reconnect.") != NULL)
                     {
                         canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
-                        canvas_draw_str(canvas, 0, 50, "Update your config settings.");
+                        canvas_draw_str(canvas, 0, 50, "Update your WiFi settings.");
                         canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
                     }
                     else if (strstr(fhttp.last_response, "[ERROR] Failed to connect to Wifi.") != NULL)
                     {
                         canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
-                        canvas_draw_str(canvas, 0, 50, "Update your config settings.");
+                        canvas_draw_str(canvas, 0, 50, "Update your WiFi settings.");
                         canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
                     }
                     else
