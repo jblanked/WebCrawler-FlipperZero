@@ -10,17 +10,30 @@
 
 // STORAGE_EXT_PATH_PREFIX is defined in the Furi SDK as /ext
 
-#define HTTP_TAG "WebCrawler"
-#define http_tag "web_crawler_app"
-#define UART_CH (FuriHalSerialIdUsart)
+#define HTTP_TAG "WebCrawler"             // change this to your app name
+#define http_tag "web_crawler_app"        // change this to your app id
+#define UART_CH (FuriHalSerialIdUsart)    // UART channel
 #define TIMEOUT_DURATION_TICKS (2 * 1000) // 2 seconds
-#define BAUDRATE (115200)
-#define RX_BUF_SIZE 1024
+#define BAUDRATE (115200)                 // UART baudrate
+#define RX_BUF_SIZE 1024                  // UART RX buffer size
 
-// UART RX Handler Callback declaration
+// Forward declaration for callback
+typedef void (*FlipperHTTP_Callback)(const char *line, void *context);
+
+// Functions
+bool flipper_http_init(FlipperHTTP_Callback callback, void *context);
+void flipper_http_deinit();
+//---
 void flipper_http_rx_callback(const char *line, void *context);
-
-// Function to save received data to a file
+bool flipper_http_send_data(const char *data);
+//---
+bool flipper_http_connect_wifi();
+bool flipper_http_disconnect_wifi();
+bool flipper_http_ping();
+bool flipper_http_save_wifi(const char *ssid, const char *password);
+//---
+bool flipper_http_get_request(const char *url);
+//---
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[]);
 
 // Define GPIO pins for UART
@@ -29,7 +42,7 @@ GpioPin test_pins[2] = {
     {.port = GPIOA, .pin = LL_GPIO_PIN_6}  // USART1_TX
 };
 
-// State variable to track if serial is receiving, sending, or idle
+// State variable to track the UART state
 typedef enum
 {
     INACTIVE,  // Inactive state
@@ -46,20 +59,17 @@ typedef enum
     WorkerEvtRxDone = (1 << 1),
 } WorkerEvtFlags;
 
-// Forward declaration for callback
-typedef void (*FlipperHTTP_Callback)(const char *line, void *context);
-
 // FlipperHTTP Structure
 typedef struct
 {
-    FuriStreamBuffer *flipper_http_stream; // Stream buffer for UART communication
-    FuriHalSerialHandle *serial_handle;    // Serial handle for UART communication
-    FuriThread *rx_thread;
-    uint8_t rx_buf[RX_BUF_SIZE];
-    FuriThreadId rx_thread_id;
+    FuriStreamBuffer *flipper_http_stream;  // Stream buffer for UART communication
+    FuriHalSerialHandle *serial_handle;     // Serial handle for UART communication
+    FuriThread *rx_thread;                  // Worker thread for UART
+    uint8_t rx_buf[RX_BUF_SIZE];            // Buffer for received data
+    FuriThreadId rx_thread_id;              // Worker thread ID
     FlipperHTTP_Callback handle_rx_line_cb; // Callback for received lines
     void *callback_context;                 // Context for the callback
-    SerialState state;
+    SerialState state;                      // State of the UART
 
     // variable to store the last received data from the UART
     char *last_response;
@@ -74,7 +84,19 @@ typedef struct
 // Declare uart as extern to prevent multiple definitions
 FlipperHTTP fhttp;
 
+typedef struct
+{
+    char *key;
+    char *value;
+} FlipperHTTPHeader;
+
 // Timer callback function
+/**
+ * @brief      Callback function for the GET timeout timer.
+ * @return     0
+ * @param      context   The context to pass to the callback.
+ * @note       This function will be called when the GET request times out.
+ */
 void get_timeout_timer_callback(void *context)
 {
     UNUSED(context);
@@ -82,7 +104,6 @@ void get_timeout_timer_callback(void *context)
 
     // Reset the state
     fhttp.started_receiving = false;
-    fhttp.just_started = false;
 
     // Free received data if any
     if (fhttp.received_data)
@@ -96,6 +117,14 @@ void get_timeout_timer_callback(void *context)
 }
 
 // UART RX Handler Callback (Interrupt Context)
+/**
+ * @brief      A private callback function to handle received data asynchronously.
+ * @return     void
+ * @param      handle    The UART handle.
+ * @param      event     The event type.
+ * @param      context   The context to pass to the callback.
+ * @note       This function will handle received data asynchronously via the callback.
+ */
 static void _flipper_http_rx_callback(FuriHalSerialHandle *handle, FuriHalSerialRxEvent event, void *context)
 {
     UNUSED(context);
@@ -108,6 +137,12 @@ static void _flipper_http_rx_callback(FuriHalSerialHandle *handle, FuriHalSerial
 }
 
 // UART worker thread
+/**
+ * @brief      Worker thread to handle UART data asynchronously.
+ * @return     0
+ * @param      context   The context to pass to the callback.
+ * @note       This function will handle received data asynchronously via the callback.
+ */
 static int32_t flipper_http_worker(void *context)
 {
     UNUSED(context);
@@ -148,6 +183,13 @@ static int32_t flipper_http_worker(void *context)
 }
 
 // UART initialization function
+/**
+ * @brief      Initialize UART.
+ * @return     true if the UART was initialized successfully, false otherwise.
+ * @param      callback  The callback function to handle received data (ex. flipper_http_rx_callback).
+ * @param      context   The context to pass to the callback.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
 bool flipper_http_init(FlipperHTTP_Callback callback, void *context)
 {
     fhttp.flipper_http_stream = furi_stream_buffer_alloc(RX_BUF_SIZE, 1);
@@ -234,6 +276,11 @@ bool flipper_http_init(FlipperHTTP_Callback callback, void *context)
 }
 
 // Deinitialize UART
+/**
+ * @brief      Deinitialize UART.
+ * @return     void
+ * @note       This function will stop the asynchronous RX, release the serial handle, and free the resources.
+ */
 void flipper_http_deinit()
 {
     if (fhttp.serial_handle == NULL)
@@ -277,6 +324,12 @@ void flipper_http_deinit()
 }
 
 // Function to send data over UART with newline termination
+/**
+ * @brief      Send data over UART with newline termination.
+ * @return     true if the data was sent successfully, false otherwise.
+ * @param      data  The data to send over UART.
+ * @note       The data will be sent over UART with a newline character appended.
+ */
 bool flipper_http_send_data(const char *data)
 {
     size_t data_length = strlen(data);
@@ -309,11 +362,21 @@ bool flipper_http_send_data(const char *data)
     fhttp.state = SENDING;
     furi_hal_serial_tx(fhttp.serial_handle, (const uint8_t *)send_buffer, send_length);
 
-    FURI_LOG_I("FlipperHTTP", "Sent data over UART: %s", send_buffer);
+    // Uncomment below line to log the data sent over UART
+    // FURI_LOG_I("FlipperHTTP", "Sent data over UART: %s", send_buffer);
     fhttp.state = IDLE;
     return true;
 }
 
+// Function to send a PING request
+/**
+ * @brief      Send a GET request to the specified URL.
+ * @return     true if the request was successful, false otherwise.
+ * @param      url  The URL to send the GET request to.
+ * @note       The received data will be handled asynchronously via the callback.
+ * @note       This is best used to check if the Wifi Dev Board is connected.
+ * @note       The state will remain INACTIVE until a PONG is received.
+ */
 bool flipper_http_ping()
 {
     const char *command = "[PING]";
@@ -329,8 +392,18 @@ bool flipper_http_ping()
 }
 
 // Function to save WiFi settings (returns true if successful)
+/**
+ * @brief      Send a command to save WiFi settings.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
 bool flipper_http_save_wifi(const char *ssid, const char *password)
 {
+    if (!ssid || !password)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_save_wifi.");
+        return false;
+    }
     char buffer[256];
     int ret = snprintf(buffer, sizeof(buffer), "[WIFI/SAVE]{\"ssid\":\"%s\",\"password\":\"%s\"}", ssid, password);
     if (ret < 0 || ret >= (int)sizeof(buffer))
@@ -350,6 +423,11 @@ bool flipper_http_save_wifi(const char *ssid, const char *password)
 }
 
 // Function to disconnect from WiFi (returns true if successful)
+/**
+ * @brief      Send a command to disconnect from WiFi.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
 bool flipper_http_disconnect_wifi()
 {
     const char *command = "[WIFI/DISCONNECT]";
@@ -364,6 +442,11 @@ bool flipper_http_disconnect_wifi()
 }
 
 // Function to connect to WiFi (returns true if successful)
+/**
+ * @brief      Send a command to connect to WiFi.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
 bool flipper_http_connect_wifi()
 {
     const char *command = "[WIFI/CONNECT]";
@@ -412,7 +495,14 @@ bool flipper_http_get_request(const char *url)
     return true;
 }
 
-// UART RX Handler Callback
+// Function to handle received data asynchronously
+/**
+ * @brief      Callback function to handle received data asynchronously.
+ * @return     void
+ * @param      line     The received line.
+ * @param      context  The context passed to the callback.
+ * @note       The received data will be handled asynchronously via the callback and handles the state of the UART.
+ */
 void flipper_http_rx_callback(const char *line, void *context)
 {
 
@@ -430,8 +520,8 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.state = RECEIVING;
     }
 
-    // Process the received line
-    FURI_LOG_I(HTTP_TAG, "Received UART line: %s", line);
+    // Uncomment below line to log the data received over UART
+    // FURI_LOG_I(HTTP_TAG, "Received UART line: %s", line);
 
     // Check if we've started receiving data from a GET request
     if (fhttp.started_receiving)
@@ -450,15 +540,19 @@ void flipper_http_rx_callback(const char *line, void *context)
                 flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 free(fhttp.received_data);
                 fhttp.received_data = NULL;
+                fhttp.started_receiving = false;
+                fhttp.just_started = false;
+                fhttp.state = IDLE;
+                return;
             }
             else
             {
                 FURI_LOG_E(HTTP_TAG, "No data received.");
+                fhttp.started_receiving = false;
+                fhttp.just_started = false;
+                fhttp.state = IDLE;
+                return;
             }
-            fhttp.started_receiving = false;
-            fhttp.just_started = false;
-            fhttp.state = IDLE;
-            return;
         }
 
         // Append the new line to the existing data
@@ -511,6 +605,8 @@ void flipper_http_rx_callback(const char *line, void *context)
         FURI_LOG_I(HTTP_TAG, "GET request succeeded.");
         fhttp.started_receiving = true;
         furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
+        fhttp.state = RECEIVING;
+        return;
     }
     else if (strstr(line, "[DISCONNECTED]") != NULL)
     {
@@ -547,7 +643,14 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.state = IDLE;
     }
 }
-
+// Function to save received data to a file
+/**
+ * @brief      Save the received data to a file.
+ * @return     true if the data was saved successfully, false otherwise.
+ * @param      bytes_received  The number of bytes received.
+ * @param      line_buffer     The buffer containing the received data.
+ * @note       The data will be saved to a file in the STORAGE_EXT_PATH_PREFIX "/apps_data/" http_tag "/received_data.txt" directory.
+ */
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[])
 {
     const char *output_file_path = STORAGE_EXT_PATH_PREFIX "/apps_data/" http_tag "/received_data.txt";

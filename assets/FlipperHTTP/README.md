@@ -24,16 +24,15 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 You should be all set. Here's the initial guide: https://www.youtube.com/watch?v=Y2lUVTMTABE
 
 
-# Usage
-The `flipper_http.h` file is for seamless use of the FlipperHTTP Firmware in `C` applications and is the root of the `Web Crawler` app. A Javascript library will be available soon, followed by a mPython library.
+## Usage in `C` (flipper_http.h)
 
-## General
+**General**
 - Init:
     - `flipper_http_init(FlipperHTTP_Callback callback, void *context)`
 - DeInit:
     - `flipper_http_deinit()`
 
-## Wifi
+**WiFi**
 - Connect To Wifi: 
     - `flipper_http_connect_wifi()`
 - Disconnect: 
@@ -43,7 +42,7 @@ The `flipper_http.h` file is for seamless use of the FlipperHTTP Firmware in `C`
 - Save Wifi: 
     - `flipper_http_save_wifi(const char *ssid, const char *password)`
 
-## Extras
+**Extras**
 - Send Data:
     - `flipper_http_send_data(const char *data)`
 - Rx Callback:
@@ -52,3 +51,28 @@ The `flipper_http.h` file is for seamless use of the FlipperHTTP Firmware in `C`
     - `flipper_http_get_request(const char *url)`
 - Save Data to SD:
     - `flipper_http_save_received_data(size_t bytes_received, const char line_buffer[])`
+
+## Usage in `JavaScript` (flipper_http.js):
+**General**
+- Init:
+    - `fhttp.init()`
+- DeInit:
+    - `fhttp.deinit()`
+
+**WiFi**
+- Connect To Wifi: 
+    - `fhttp.connect_wifi()`
+- Disconnect: 
+    - `fhttp.disconnect_wifi()`
+- Ping: 
+    - `fhttp.ping()`
+- Save Wifi: 
+    - `fhttp.save_wifi(ssid, password)`
+
+**Extras**
+- Send Data:
+    - `fhttp.send_data(data)`
+- Read Data:
+    - `fhttp.read_data(delay_ms)`
+- GET request:
+    - `fhttp.get_request(url)`

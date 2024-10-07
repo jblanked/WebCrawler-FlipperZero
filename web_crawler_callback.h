@@ -8,15 +8,22 @@ static WebCrawlerApp *app_instance = NULL;
 static void web_crawler_setting_item_path_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_password_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index);
 
 static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
 {
     UNUSED(context);
-
-    WebCrawlerApp *app = app_instance;
-    if (!app)
+    if (!app_instance)
     {
-        FURI_LOG_E(TAG, "App is NULL");
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!canvas)
+    {
+        FURI_LOG_E(TAG, "Canvas is NULL");
         return;
     }
 
@@ -34,7 +41,7 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
         return;
     }
 
-    if (app->path)
+    if (app_instance->path)
     {
         if (!sent_get_request)
         {
@@ -42,14 +49,15 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             canvas_draw_str(canvas, 0, 10, "Sending GET request...");
 
             // Perform GET request and handle the response
-            get_success = flipper_http_get_request(app->path);
+            get_success = flipper_http_get_request(app_instance->path);
 
             canvas_draw_str(canvas, 0, 20, "Sent!");
 
             if (get_success)
             {
                 canvas_draw_str(canvas, 0, 30, "Receiving data...");
-                get_success = true;
+                // Set the state to RECEIVING to ensure we continue to see the receiving message
+                fhttp.state = RECEIVING;
             }
             else
             {
@@ -60,14 +68,13 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
         }
         else
         {
+            // print state
             if (get_success && fhttp.state == RECEIVING)
             {
                 canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
-                already_success = true;
             }
             else if (get_success && fhttp.state == IDLE)
             {
-                already_success = true;
                 canvas_draw_str(canvas, 0, 10, "Data saved to file.");
                 canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
             }
@@ -116,28 +123,53 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
  * @param      context   The context - WebCrawlerApp object.
  * @return     WebCrawlerViewSubmenu
  */
-static uint32_t web_crawler_back_to_main_callback(void *context)
-{
-    UNUSED(context);
-    sent_get_request = false;
-    get_success = false;
-    already_success = false;
-    if (app_instance && app_instance->textbox)
-    {
-        widget_reset(app_instance->textbox);
-    }
-    return WebCrawlerViewSubmenu; // Return to the main submenu view
-}
-
-/**
- * @brief      Navigation callback to handle returning to the Configure screen.
- * @param      context   The context - WebCrawlerApp object.
- * @return     WebCrawlerViewConfigure
- */
 static uint32_t web_crawler_back_to_configure_callback(void *context)
 {
     UNUSED(context);
-    return WebCrawlerViewConfigure; // Return to the Configure screen
+    // free file read widget if it exists
+    if (app_instance->widget_file_read)
+    {
+        widget_reset(app_instance->widget_file_read);
+    }
+    return WebCrawlerViewSubmenuConfig; // Return to the configure screen
+}
+
+/**
+ * @brief      Navigation callback to handle returning to the Wifi Settings screen.
+ * @param      context   The context - WebCrawlerApp object.
+ * @return     WebCrawlerViewSubmenu
+ */
+static uint32_t web_crawler_back_to_main_callback(void *context)
+{
+    UNUSED(context);
+    // reset GET request flags
+    sent_get_request = false;
+    get_success = false;
+    already_success = false;
+    // free file read widget if it exists
+    if (app_instance->widget_file_read)
+    {
+        widget_reset(app_instance->widget_file_read);
+    }
+    return WebCrawlerViewSubmenuMain; // Return to the main submenu
+}
+
+static uint32_t web_crawler_back_to_file_callback(void *context)
+{
+    UNUSED(context);
+    return WebCrawlerViewVariableItemListFile; // Return to the file submenu
+}
+
+static uint32_t web_crawler_back_to_wifi_callback(void *context)
+{
+    UNUSED(context);
+    return WebCrawlerViewVariableItemListWifi; // Return to the wifi submenu
+}
+
+static uint32_t web_crawler_back_to_request_callback(void *context)
+{
+    UNUSED(context);
+    return WebCrawlerViewVariableItemListRequest; // Return to the request submenu
 }
 
 /**
@@ -159,37 +191,54 @@ static uint32_t web_crawler_exit_app_callback(void *context)
 static void web_crawler_submenu_callback(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+
+    if (app->view_dispatcher)
+    {
+        switch (index)
+        {
+        case WebCrawlerSubmenuIndexRun:
+            sent_get_request = false; // Reset the flag
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewRun);
+            break;
+        case WebCrawlerSubmenuIndexAbout:
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewAbout);
+            break;
+        case WebCrawlerSubmenuIndexConfig:
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig);
+            break;
+        case WebCrawlerSubmenuIndexWifi:
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
+            break;
+        case WebCrawlerSubmenuIndexRequest:
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+            break;
+        case WebCrawlerSubmenuIndexFile:
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
+            break;
+        default:
+            FURI_LOG_E(TAG, "Unknown submenu index");
+            break;
+        }
+    }
+}
+
+/**
+ * @brief      Configuration enter callback to handle different items.
+ * @param      context   The context - WebCrawlerApp object.
+ * @param      index     The index of the item that was clicked.
+ */
+static void web_crawler_wifi_enter_callback(void *context, uint32_t index)
+{
     switch (index)
     {
-    case WebCrawlerSubmenuIndexRun:
-        sent_get_request = false; // Reset the flag
-        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewRun);
+    case 0: // SSID
+        web_crawler_setting_item_ssid_clicked(context, index);
         break;
-    case WebCrawlerSubmenuIndexAbout:
-        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewAbout);
-        break;
-    case WebCrawlerSubmenuIndexSetPath:
-        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
-        break;
-    case WebCrawlerSubmenuIndexData:
-        if (!load_received_data())
-        {
-            if (app_instance->textbox)
-            {
-                widget_reset(app_instance->textbox);
-                widget_add_text_scroll_element(
-                    app_instance->textbox,
-                    0,
-                    0,
-                    128,
-                    64, "File is empty.");
-            }
-        }
-        view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewData);
+    case 1: // Password
+        web_crawler_setting_item_password_clicked(context, index);
         break;
     default:
-        FURI_LOG_E(TAG, "Unknown submenu index");
+        FURI_LOG_E(TAG, "Unknown configuration item index");
         break;
     }
 }
@@ -199,18 +248,39 @@ static void web_crawler_submenu_callback(void *context, uint32_t index)
  * @param      context   The context - WebCrawlerApp object.
  * @param      index     The index of the item that was clicked.
  */
-static void web_crawler_config_enter_callback(void *context, uint32_t index)
+static void web_crawler_file_enter_callback(void *context, uint32_t index)
 {
     switch (index)
     {
-    case 0:
+    case 0: // File Read
+        web_crawler_setting_item_file_read_clicked(context, index);
+        break;
+    case 1: // FIle Type
+        web_crawler_setting_item_file_type_clicked(context, index);
+        break;
+    case 2: // File Rename
+        web_crawler_setting_item_file_rename_clicked(context, index);
+        break;
+    case 3: // File Delete
+        web_crawler_setting_item_file_delete_clicked(context, index);
+        break;
+    default:
+        FURI_LOG_E(TAG, "Unknown configuration item index");
+        break;
+    }
+}
+
+/**
+ * @brief      Configuration enter callback to handle different items.
+ * @param      context   The context - WebCrawlerApp object.
+ * @param      index     The index of the item that was clicked.
+ */
+static void web_crawler_request_enter_callback(void *context, uint32_t index)
+{
+    switch (index)
+    {
+    case 0: // URL
         web_crawler_setting_item_path_clicked(context, index);
-        break;
-    case 1:
-        web_crawler_setting_item_ssid_clicked(context, index);
-        break;
-    case 2:
-        web_crawler_setting_item_password_clicked(context, index);
         break;
     default:
         FURI_LOG_E(TAG, "Unknown configuration item index");
@@ -225,9 +295,16 @@ static void web_crawler_config_enter_callback(void *context, uint32_t index)
 static void web_crawler_set_path_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-
-    furi_check(app);
-
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->path || !app->temp_buffer_path || !app->temp_buffer_size_path || !app->path_item)
+    {
+        FURI_LOG_E(TAG, "Invalid path buffer");
+        return;
+    }
     // Store the entered URL from temp_buffer_path to path
     strncpy(app->path, app->temp_buffer_path, app->temp_buffer_size_path - 1);
 
@@ -236,7 +313,7 @@ static void web_crawler_set_path_updated(void *context)
         variable_item_set_current_value_text(app->path_item, app->path);
 
         // Save the URL to the settings
-        save_settings(app->path, app->ssid, app->password);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
 
         // send to UART
         if (!flipper_http_save_wifi(app->ssid, app->password))
@@ -249,7 +326,7 @@ static void web_crawler_set_path_updated(void *context)
     }
 
     // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
 }
 
 /**
@@ -259,7 +336,16 @@ static void web_crawler_set_path_updated(void *context)
 static void web_crawler_set_ssid_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_ssid || !app->temp_buffer_size_ssid || !app->ssid || !app->ssid_item)
+    {
+        FURI_LOG_E(TAG, "Invalid SSID buffer");
+        return;
+    }
     // Store the entered SSID from temp_buffer_ssid to ssid
     strncpy(app->ssid, app->temp_buffer_ssid, app->temp_buffer_size_ssid - 1);
 
@@ -268,7 +354,7 @@ static void web_crawler_set_ssid_updated(void *context)
         variable_item_set_current_value_text(app->ssid_item, app->ssid);
 
         // Save the SSID to the settings
-        save_settings(app->path, app->ssid, app->password);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
 
         // send to UART
         if (!flipper_http_save_wifi(app->ssid, app->password))
@@ -281,7 +367,7 @@ static void web_crawler_set_ssid_updated(void *context)
     }
 
     // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
 }
 
 /**
@@ -291,7 +377,16 @@ static void web_crawler_set_ssid_updated(void *context)
 static void web_crawler_set_password_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_password || !app->temp_buffer_size_password || !app->password || !app->password_item)
+    {
+        FURI_LOG_E(TAG, "Invalid password buffer");
+        return;
+    }
     // Store the entered Password from temp_buffer_password to password
     strncpy(app->password, app->temp_buffer_password, app->temp_buffer_size_password - 1);
 
@@ -300,7 +395,7 @@ static void web_crawler_set_password_update(void *context)
         variable_item_set_current_value_text(app->password_item, app->password);
 
         // Save the Password to the settings
-        save_settings(app->path, app->ssid, app->password);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
 
         // send to UART
         if (!flipper_http_save_wifi(app->ssid, app->password))
@@ -313,7 +408,81 @@ static void web_crawler_set_password_update(void *context)
     }
 
     // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewConfigure);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
+}
+
+/**
+ * @brief      Callback for when the user finishes entering the File Type.
+ * @param      context   The context - WebCrawlerApp object.
+ */
+static void web_crawler_set_file_type_update(void *context)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_file_type || !app->temp_buffer_size_file_type || !app->file_type || !app->file_type_item)
+    {
+        FURI_LOG_E(TAG, "Invalid file type buffer");
+        return;
+    }
+    // Temporary buffer to store the old name
+    char old_file_type[256];
+
+    strncpy(old_file_type, app->file_type, sizeof(old_file_type) - 1);
+    old_file_type[sizeof(old_file_type) - 1] = '\0'; // Null-terminate
+    strncpy(app->file_type, app->temp_buffer_file_type, app->temp_buffer_size_file_type - 1);
+
+    if (app->file_type_item)
+    {
+        variable_item_set_current_value_text(app->file_type_item, app->file_type);
+    }
+
+    rename_received_data(app->file_rename, app->file_rename, app->file_type, old_file_type);
+
+    // Return to the Configure view
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
+}
+
+/**
+ * @brief      Callback for when the user finishes entering the File Rename.
+ * @param      context   The context - WebCrawlerApp object.
+ */
+static void web_crawler_set_file_rename_update(void *context)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_file_rename || !app->temp_buffer_size_file_rename || !app->file_rename || !app->file_rename_item)
+    {
+        FURI_LOG_E(TAG, "Invalid file rename buffer");
+        return;
+    }
+
+    // Temporary buffer to store the old name
+    char old_name[256];
+
+    // Ensure that app->file_rename is null-terminated
+    strncpy(old_name, app->file_rename, sizeof(old_name) - 1);
+    old_name[sizeof(old_name) - 1] = '\0'; // Null-terminate
+
+    // Store the entered File Rename from temp_buffer_file_rename to file_rename
+    strncpy(app->file_rename, app->temp_buffer_file_rename, app->temp_buffer_size_file_rename - 1);
+
+    if (app->file_rename_item)
+    {
+        variable_item_set_current_value_text(app->file_rename_item, app->file_rename);
+    }
+
+    rename_received_data(old_name, app->file_rename, app->file_type, app->file_type);
+
+    // Return to the Configure view
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
 }
 
 /**
@@ -324,13 +493,23 @@ static void web_crawler_set_password_update(void *context)
 static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->text_input_path)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
+
     UNUSED(index);
     // Set up the text input
     text_input_set_header_text(app->text_input_path, "Enter URL");
 
     // Initialize temp_buffer with existing path
-    if (app->path)
+    if (app->path && strlen(app->path) > 0)
     {
         strncpy(app->temp_buffer_path, app->path, app->temp_buffer_size_path - 1);
     }
@@ -354,7 +533,7 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
         text_input_get_view(app->text_input_path),
-        web_crawler_back_to_configure_callback);
+        web_crawler_back_to_request_callback);
 
     // Show text input dialog
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInput);
@@ -368,13 +547,22 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
     UNUSED(index);
+    if (!app->text_input_ssid)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
     // Set up the text input
     text_input_set_header_text(app->text_input_ssid, "Enter SSID");
 
     // Initialize temp_buffer with existing SSID
-    if (app->ssid)
+    if (app->ssid && strlen(app->ssid) > 0)
     {
         strncpy(app->temp_buffer_ssid, app->ssid, app->temp_buffer_size_ssid - 1);
     }
@@ -398,7 +586,7 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
         text_input_get_view(app->text_input_ssid),
-        web_crawler_back_to_configure_callback);
+        web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputSSID);
@@ -412,8 +600,17 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 static void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app);
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
     UNUSED(index);
+    if (!app->text_input_password)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
     // Set up the text input
     text_input_set_header_text(app->text_input_password, "Enter Password");
 
@@ -434,8 +631,176 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
         text_input_get_view(app->text_input_password),
-        web_crawler_back_to_configure_callback);
+        web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputPassword);
+}
+
+/**
+ * @brief      Handler for File Type configuration item click.
+ * @param      context  The context - WebCrawlerApp object.
+ * @param      index    The index of the item that was clicked.
+ */
+static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+    if (!app->text_input_file_type)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
+    // Set up the text input
+    text_input_set_header_text(app->text_input_file_type, "Enter File Type");
+
+    // Initialize temp_buffer with existing file_type
+    if (app->file_type && strlen(app->file_type) > 0)
+    {
+        strncpy(app->temp_buffer_file_type, app->file_type, app->temp_buffer_size_file_type - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_file_type, ".txt", app->temp_buffer_size_file_type - 1);
+    }
+
+    app->temp_buffer_file_type[app->temp_buffer_size_file_type - 1] = '\0';
+
+    // Configure the text input
+    bool clear_previous_text = false;
+    text_input_set_result_callback(
+        app->text_input_file_type,
+        web_crawler_set_file_type_update,
+        app,
+        app->temp_buffer_file_type,
+        app->temp_buffer_size_file_type,
+        clear_previous_text);
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        text_input_get_view(app->text_input_file_type),
+        web_crawler_back_to_file_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputFileType);
+}
+
+/**
+ * @brief      Handler for File Rename configuration item click.
+ * @param      context  The context - WebCrawlerApp object.
+ * @param      index    The index of the item that was clicked.
+ */
+static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+    if (!app->text_input_file_rename)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
+    // Set up the text input
+    text_input_set_header_text(app->text_input_file_rename, "Enter File Rename");
+
+    // Initialize temp_buffer with existing file_rename
+    if (app->file_rename && strlen(app->file_rename) > 0)
+    {
+        strncpy(app->temp_buffer_file_rename, app->file_rename, app->temp_buffer_size_file_rename - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_file_rename, "received_data", app->temp_buffer_size_file_rename - 1);
+    }
+
+    app->temp_buffer_file_rename[app->temp_buffer_size_file_rename - 1] = '\0';
+
+    // Configure the text input
+    bool clear_previous_text = false;
+    text_input_set_result_callback(
+        app->text_input_file_rename,
+        web_crawler_set_file_rename_update,
+        app,
+        app->temp_buffer_file_rename,
+        app->temp_buffer_size_file_rename,
+        clear_previous_text);
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        text_input_get_view(app->text_input_file_rename),
+        web_crawler_back_to_file_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename);
+}
+
+/**
+ * @brief      Handler for File Delete configuration item click.
+ * @param      context  The context - WebCrawlerApp object.
+ * @param      index    The index of the item that was clicked.
+ */
+static void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+
+    if (!delete_received_data(app))
+    {
+        FURI_LOG_E(TAG, "Failed to delete file");
+    }
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        widget_get_view(app->widget_file_delete),
+        web_crawler_back_to_file_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileDelete);
+}
+
+static void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+
+    if (!load_received_data(app))
+    {
+        if (app->widget_file_read)
+        {
+            widget_reset(app->widget_file_read);
+            widget_add_text_scroll_element(
+                app->widget_file_read,
+                0,
+                0,
+                128,
+                64, "File is empty.");
+        }
+    }
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        widget_get_view(app->widget_file_read),
+        web_crawler_back_to_file_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
 }

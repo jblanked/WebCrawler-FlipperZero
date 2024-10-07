@@ -5,7 +5,10 @@
 #include <storage/storage.h>
 
 #define SETTINGS_PATH STORAGE_EXT_PATH_PREFIX "/apps_data/" http_tag "/settings.bin"
-#define RECEIVED_DATA_PATH STORAGE_EXT_PATH_PREFIX "/apps_data/" http_tag "/received_data.txt"
+#define RECEIVED_DATA_PATH STORAGE_EXT_PATH_PREFIX "/apps_data/" http_tag "/" // add the file name to the end (e.g. "received_data.txt")
+
+// will need to make a duplicate of the file
+// one to save data, and the other for users to manipulate
 
 #define MAX_RECEIVED_DATA_SIZE 1024
 #define SHOW_MAX_FILE_SIZE 2048
@@ -14,7 +17,7 @@
 #define TRUNCATION_NOTICE "\n\n[Data truncated due to size limits]"
 
 // Function to save settings: path, SSID, and password
-static void save_settings(const char *path, const char *ssid, const char *password)
+static void save_settings(const char *path, const char *ssid, const char *password, const char *file_rename, const char *file_type)
 {
     // Create the directory for saving settings
     char directory_path[256];
@@ -32,6 +35,11 @@ static void save_settings(const char *path, const char *ssid, const char *passwo
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
         return;
+    }
+
+    if (file_type == NULL || strlen(file_type) == 0)
+    {
+        file_type = ".txt";
     }
 
     // Save the path length and data
@@ -58,7 +66,21 @@ static void save_settings(const char *path, const char *ssid, const char *passwo
         FURI_LOG_E(TAG, "Failed to write password");
     }
 
-    FURI_LOG_I(TAG, "Settings saved: path=%s, ssid=%s, password=%s", path, ssid, password);
+    // Save the file rename length and data
+    size_t file_rename_length = strlen(file_rename) + 1; // Include null terminator
+    if (storage_file_write(file, &file_rename_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, file_rename, file_rename_length) != file_rename_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write file rename");
+    }
+
+    // Save the file type length and data
+    size_t file_type_length = strlen(file_type) + 1; // Include null terminator
+    if (storage_file_write(file, &file_type_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, file_type, file_type_length) != file_type_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write file type");
+    }
 
     storage_file_close(file);
     storage_file_free(file);
@@ -66,8 +88,24 @@ static void save_settings(const char *path, const char *ssid, const char *passwo
 }
 
 // Function to load settings: path, SSID, and password
-static bool load_settings(char *path, size_t path_size, char *ssid, size_t ssid_size, char *password, size_t password_size, WebCrawlerApp *app)
+static bool load_settings(
+    char *path,
+    size_t path_size,
+    char *ssid,
+    size_t ssid_size,
+    char *password,
+    size_t password_size,
+    char *file_rename,
+    size_t file_rename_size,
+    char *file_type,
+    size_t file_type_size,
+    WebCrawlerApp *app)
 {
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return false;
+    }
     Storage *storage = furi_record_open(RECORD_STORAGE);
     File *file = storage_file_alloc(storage);
 
@@ -118,15 +156,177 @@ static bool load_settings(char *path, size_t path_size, char *ssid, size_t ssid_
     }
     password[password_length - 1] = '\0'; // Ensure null-termination
 
+    // Load the file rename
+    size_t file_rename_length;
+    if (storage_file_read(file, &file_rename_length, sizeof(size_t)) != sizeof(size_t) || file_rename_length > file_rename_size ||
+        storage_file_read(file, file_rename, file_rename_length) != file_rename_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read file rename");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+    file_rename[file_rename_length - 1] = '\0'; // Ensure null-termination
+
+    // Load the file type
+    size_t file_type_length;
+    if (storage_file_read(file, &file_type_length, sizeof(size_t)) != sizeof(size_t) || file_type_length > file_type_size ||
+        storage_file_read(file, file_type, file_type_length) != file_type_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read file type");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+    file_type[file_type_length - 1] = '\0'; // Ensure null-termination
+
     // set the path, ssid, and password
     strncpy(app->path, path, path_size);
     strncpy(app->ssid, ssid, ssid_size);
     strncpy(app->password, password, password_size);
+    strncpy(app->file_rename, file_rename, file_rename_size);
+    strncpy(app->file_type, file_type, file_type_size);
 
     storage_file_close(file);
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
     return true;
+}
+
+static bool delete_received_data(WebCrawlerApp *app)
+{
+    if (app == NULL)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return false;
+    }
+    // Open the storage record
+    Storage *storage = furi_record_open(RECORD_STORAGE);
+    if (!storage)
+    {
+        FURI_LOG_E(TAG, "Failed to open storage record");
+        return false;
+    }
+
+    if (!storage_simply_remove_recursive(storage, RECEIVED_DATA_PATH "received_data.txt"))
+    {
+        FURI_LOG_E(TAG, "Failed to delete main file");
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Allocate memory for new_path
+    char *new_path = malloc(256);
+    if (new_path == NULL)
+    {
+        FURI_LOG_E(TAG, "Memory allocation failed for paths");
+        free(new_path);
+        return false;
+    }
+
+    if (app->file_type == NULL || strlen(app->file_type) == 0)
+    {
+        app->file_type = ".txt";
+    }
+
+    // Format the new_path
+    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+    if (ret_new < 0 || (size_t)ret_new >= 256)
+    {
+        FURI_LOG_E(TAG, "Failed to create new_path");
+        free(new_path);
+        return false;
+    }
+
+    if (!storage_simply_remove_recursive(storage, new_path))
+    {
+        FURI_LOG_E(TAG, "Failed to delete duplicate file");
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    furi_record_close(RECORD_STORAGE);
+
+    return true;
+}
+
+static bool rename_received_data(const char *old_name, const char *new_name, const char *file_type, const char *old_file_type)
+{
+    // Open the storage record
+    Storage *storage = furi_record_open(RECORD_STORAGE);
+    if (!storage)
+    {
+        FURI_LOG_E(TAG, "Failed to open storage record");
+        return false;
+    }
+    // Allocate memory for old_path and new_path
+    char *new_path = malloc(256);
+    char *old_path = malloc(256);
+    if (new_path == NULL || old_path == NULL)
+    {
+        FURI_LOG_E(TAG, "Memory allocation failed for paths");
+        free(old_path);
+        free(new_path);
+        return false;
+    }
+
+    if (file_type == NULL || strlen(file_type) == 0)
+    {
+        file_type = ".txt";
+    }
+    if (old_file_type == NULL || strlen(old_file_type) == 0)
+    {
+        old_file_type = ".txt";
+    }
+
+    // Format the old_path
+    int ret_old = snprintf(old_path, 256, "%s%s%s", RECEIVED_DATA_PATH, old_name, old_file_type);
+    if (ret_old < 0 || (size_t)ret_old >= 256)
+    {
+        FURI_LOG_E(TAG, "Failed to create old_path");
+        free(old_path);
+        free(new_path);
+        return false;
+    }
+
+    // Format the new_path
+    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, new_name, file_type);
+    if (ret_new < 0 || (size_t)ret_new >= 256)
+    {
+        FURI_LOG_E(TAG, "Failed to create new_path");
+        free(old_path);
+        free(new_path);
+        return false;
+    }
+
+    // Check if the file exists
+    if (!storage_file_exists(storage, old_path))
+    {
+        if (!storage_file_exists(storage, RECEIVED_DATA_PATH "received_data.txt"))
+        {
+            FURI_LOG_E(TAG, "No saved file exists");
+            free(old_path);
+            free(new_path);
+            furi_record_close(RECORD_STORAGE);
+            return false;
+        }
+        else
+        {
+            bool renamed = storage_common_copy(storage, RECEIVED_DATA_PATH "received_data.txt", new_path) == FSE_OK;
+
+            furi_record_close(RECORD_STORAGE);
+            return renamed;
+        }
+    }
+    else
+    {
+        bool renamed = storage_common_rename(storage, old_path, new_path) == FSE_OK;
+        storage_simply_remove_recursive(storage, old_path);
+        furi_record_close(RECORD_STORAGE);
+        return renamed;
+    }
 }
 
 static bool text_show_read_lines(File *file, FuriString *str_result)
@@ -154,14 +354,15 @@ static bool text_show_read_lines(File *file, FuriString *str_result)
     return true;
 }
 
-static bool load_received_data()
+static bool load_received_data(WebCrawlerApp *app)
 {
-    if (!app_instance)
+    if (app == NULL)
     {
-        FURI_LOG_E(TAG, "App instance is NULL");
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
         return false;
     }
-    if (!app_instance->textbox)
+
+    if (!app->widget_file_read)
     {
         FURI_LOG_E(TAG, "Textbox is NULL");
         return false;
@@ -185,9 +386,8 @@ static bool load_received_data()
     }
 
     // Open the file for reading
-    if (!storage_file_open(file, RECEIVED_DATA_PATH, FSAM_READ, FSOM_OPEN_EXISTING))
+    if (!storage_file_open(file, RECEIVED_DATA_PATH "received_data.txt", FSAM_READ, FSOM_OPEN_EXISTING))
     {
-        FURI_LOG_E(TAG, "Failed to open received data file for reading: %s", RECEIVED_DATA_PATH);
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
         return false; // Return false if the file does not exist
@@ -224,12 +424,12 @@ static bool load_received_data()
     const char *data_cstr = furi_string_get_cstr(str_result);
     // Set the text box with the received data
 
-    widget_reset(app_instance->textbox);
-    FURI_LOG_D(TAG, "Received data: %s", data_cstr);
+    widget_reset(app->widget_file_read);
+
     if (str_result != NULL)
     {
         widget_add_text_scroll_element(
-            app_instance->textbox,
+            app->widget_file_read,
             0,
             0,
             128,
@@ -238,7 +438,7 @@ static bool load_received_data()
     else
     {
         widget_add_text_scroll_element(
-            app_instance->textbox,
+            app->widget_file_read,
             0,
             0,
             128,

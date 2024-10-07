@@ -1,11 +1,10 @@
 #ifndef WEB_CRAWLER_I_H
 #define WEB_CRAWLER_I_H
-
 /**
  * @brief      Function to allocate resources for the WebCrawlerApp.
  * @return     Pointer to the initialized WebCrawlerApp, or NULL on failure.
  */
-static WebCrawlerApp *web_crawler_app_alloc()
+WebCrawlerApp *web_crawler_app_alloc()
 {
     // Initialize the entire structure to zero to prevent undefined behavior
     WebCrawlerApp *app = (WebCrawlerApp *)malloc(sizeof(WebCrawlerApp));
@@ -110,218 +109,220 @@ static WebCrawlerApp *web_crawler_app_alloc()
     }
     app->password[0] = '\0';
 
+    // Allocate and initialize temp_buffer_file_type
+    app->temp_buffer_size_file_type = 128;
+    app->temp_buffer_file_type = malloc(app->temp_buffer_size_file_type);
+    if (!app->temp_buffer_file_type)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_file_type");
+        free_all(app, "Failed to allocate temp_buffer_file_type");
+        return NULL;
+    }
+
+    // Allocate file_type
+    app->file_type = malloc(app->temp_buffer_size_file_type);
+    if (!app->file_type)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate file_type");
+        free_all(app, "Failed to allocate file_type");
+        return NULL;
+    }
+    app->file_type[0] = '\0';
+
+    // Allocate and intialize temp_buffer_file_rename
+    app->temp_buffer_size_file_rename = 128;
+    app->temp_buffer_file_rename = malloc(app->temp_buffer_size_file_rename);
+    if (!app->temp_buffer_file_rename)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_file_rename");
+        free_all(app, "Failed to allocate temp_buffer_file_rename");
+        return NULL;
+    }
+
+    // Allocate file_rename
+    app->file_rename = malloc(app->temp_buffer_size_file_rename);
+    if (!app->file_rename)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate file_rename");
+        free_all(app, "Failed to allocate file_rename");
+        return NULL;
+    }
+    app->file_rename[0] = '\0';
+
     // Allocate TextInput views
     app->text_input_path = text_input_alloc();
-    if (!app->text_input_path)
-    {
-        free_all(app, "Failed to allocate TextInput for Path");
-        return NULL;
-    }
-
     app->text_input_ssid = text_input_alloc();
-    if (!app->text_input_ssid)
-    {
-        free_all(app, "Failed to allocate TextInput for SSID");
-        return NULL;
-    }
-
     app->text_input_password = text_input_alloc();
-    if (!app->text_input_password)
+    app->text_input_file_type = text_input_alloc();
+    app->text_input_file_rename = text_input_alloc();
+    if (!app->text_input_path || !app->text_input_ssid || !app->text_input_password || !app->text_input_file_type || !app->text_input_file_rename)
     {
-        free_all(app, "Failed to allocate TextInput for Password");
+        FURI_LOG_E(TAG, "Failed to allocate TextInput");
+        free_all(app, "Failed to allocate TextInput");
         return NULL;
     }
 
     // Add TextInput views with unique view IDs
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        WebCrawlerViewTextInput,
-        text_input_get_view(app->text_input_path));
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        WebCrawlerViewTextInputSSID,
-        text_input_get_view(app->text_input_ssid));
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        WebCrawlerViewTextInputPassword,
-        text_input_get_view(app->text_input_password));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInput, text_input_get_view(app->text_input_path));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputSSID, text_input_get_view(app->text_input_ssid));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPassword, text_input_get_view(app->text_input_password));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileType, text_input_get_view(app->text_input_file_type));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename, text_input_get_view(app->text_input_file_rename));
 
     // Set previous callback for TextInput views to return to Configure screen
-    view_set_previous_callback(
-        text_input_get_view(app->text_input_path),
-        web_crawler_back_to_configure_callback);
-    view_set_previous_callback(
-        text_input_get_view(app->text_input_ssid),
-        web_crawler_back_to_configure_callback);
-    view_set_previous_callback(
-        text_input_get_view(app->text_input_password),
-        web_crawler_back_to_configure_callback);
+    view_set_previous_callback(text_input_get_view(app->text_input_path), web_crawler_back_to_request_callback);
+    view_set_previous_callback(text_input_get_view(app->text_input_ssid), web_crawler_back_to_wifi_callback);
+    view_set_previous_callback(text_input_get_view(app->text_input_password), web_crawler_back_to_wifi_callback);
+    view_set_previous_callback(text_input_get_view(app->text_input_file_type), web_crawler_back_to_file_callback);
+    view_set_previous_callback(text_input_get_view(app->text_input_file_rename), web_crawler_back_to_file_callback);
 
     // Allocate Configuration screen
-    app->variable_item_list_config = variable_item_list_alloc();
-    if (!app->variable_item_list_config)
+    app->variable_item_list_wifi = variable_item_list_alloc();
+    app->variable_item_list_file = variable_item_list_alloc();
+    app->variable_item_list_request = variable_item_list_alloc();
+    if (!app->variable_item_list_wifi || !app->variable_item_list_file || !app->variable_item_list_request)
     {
-        free_all(app, "Failed to allocate VariableItemList for Configuration");
+        FURI_LOG_E(TAG, "Failed to allocate VariableItemList");
+        free_all(app, "Failed to allocate VariableItemList");
         return NULL;
     }
-    variable_item_list_reset(app->variable_item_list_config);
+    variable_item_list_reset(app->variable_item_list_wifi);
+    variable_item_list_reset(app->variable_item_list_file);
+    variable_item_list_reset(app->variable_item_list_request);
 
-    // Add "Path" item to the configuration screen
-    app->path_item = variable_item_list_add(
-        app->variable_item_list_config,
-        "Path",
-        1,    // Number of possible values (1 for a single text value)
-        NULL, // No change callback needed
-        NULL  // No context needed
-    );
-    if (!app->path_item)
+    // Add item to the configuration screen
+    app->path_item = variable_item_list_add(app->variable_item_list_request, "Path", 0, NULL, NULL);
+    //
+    app->ssid_item = variable_item_list_add(app->variable_item_list_wifi, "SSID", 0, NULL, NULL);         // index 0
+    app->password_item = variable_item_list_add(app->variable_item_list_wifi, "Password", 0, NULL, NULL); // index 1
+    //
+    app->file_read_item = variable_item_list_add(app->variable_item_list_file, "Read File", 0, NULL, NULL);     // index 0
+    app->file_type_item = variable_item_list_add(app->variable_item_list_file, "Set File Type", 0, NULL, NULL); // index 1
+    app->file_rename_item = variable_item_list_add(app->variable_item_list_file, "Rename File", 0, NULL, NULL); // index 2
+    app->file_delete_item = variable_item_list_add(app->variable_item_list_file, "Delete File", 0, NULL, NULL); // index 3
+
+    if (!app->ssid_item || !app->password_item || !app->file_type_item || !app->file_rename_item || !app->path_item || !app->file_read_item || !app->file_delete_item)
     {
-        free_all(app, "Failed to add Path item to VariableItemList");
+        free_all(app, "Failed to add items to VariableItemList");
         return NULL;
     }
-    variable_item_set_current_value_text(app->path_item, ""); // Initialize
 
-    // Add "SSID" item to the configuration screen
-    app->ssid_item = variable_item_list_add(
-        app->variable_item_list_config,
-        "SSID",
-        1,    // Number of possible values (1 for a single text value)
-        NULL, // No change callback needed
-        NULL  // No context needed
-    );
-    if (!app->ssid_item)
-    {
-        free_all(app, "Failed to add SSID item to VariableItemList");
-        return NULL;
-    }
-    variable_item_set_current_value_text(app->ssid_item, ""); // Initialize
+    variable_item_set_current_value_text(app->path_item, "");        // Initialize
+    variable_item_set_current_value_text(app->ssid_item, "");        // Initialize
+    variable_item_set_current_value_text(app->password_item, "");    // Initialize
+    variable_item_set_current_value_text(app->file_type_item, "");   // Initialize
+    variable_item_set_current_value_text(app->file_rename_item, ""); // Initialize
+    variable_item_set_current_value_text(app->file_read_item, "");   // Initialize
+    variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
-    // Add "Password" item to the configuration screen
-    app->password_item = variable_item_list_add(
-        app->variable_item_list_config,
-        "Password",
-        1,    // Number of possible values (1 for a single text value)
-        NULL, // No change callback needed
-        NULL  // No context needed
-    );
-    if (!app->password_item)
-    {
-        free_all(app, "Failed to add Password item to VariableItemList");
-        return NULL;
-    }
-    variable_item_set_current_value_text(app->password_item, ""); // Initialize
+    // Set a single callback for all items
+    variable_item_list_set_enter_callback(app->variable_item_list_wifi, web_crawler_wifi_enter_callback, app);
+    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_wifi), web_crawler_back_to_configure_callback);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi, variable_item_list_get_view(app->variable_item_list_wifi));
 
-    // Set a single enter callback for all configuration items
-    variable_item_list_set_enter_callback(
-        app->variable_item_list_config,
-        web_crawler_config_enter_callback,
-        app);
+    variable_item_list_set_enter_callback(app->variable_item_list_file, web_crawler_file_enter_callback, app);
+    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_file), web_crawler_back_to_configure_callback);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile, variable_item_list_get_view(app->variable_item_list_file));
 
-    // Set previous callback for configuration screen
-    view_set_previous_callback(
-        variable_item_list_get_view(app->variable_item_list_config),
-        web_crawler_back_to_main_callback);
+    variable_item_list_set_enter_callback(app->variable_item_list_request, web_crawler_request_enter_callback, app);
+    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_request), web_crawler_back_to_configure_callback);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest, variable_item_list_get_view(app->variable_item_list_request));
+    //------------------------------//
+    //        SUBMENU VIEW          //
+    //------------------------------//
 
-    // Add Configuration view to ViewDispatcher
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        WebCrawlerViewConfigure,
-        variable_item_list_get_view(app->variable_item_list_config));
-
-    // Allocate Submenu view
-    app->submenu = submenu_alloc();
-    if (!app->submenu)
+    // Allocate
+    app->submenu_main = submenu_alloc();
+    app->submenu_config = submenu_alloc();
+    if (!app->submenu_main || !app->submenu_config)
     {
         FURI_LOG_E(TAG, "Failed to allocate Submenu");
         free_all(app, "Failed to allocate Submenu");
         return NULL;
     }
 
-    submenu_set_header(app->submenu, "Web Crawler v0.2");
+    // Set header
+    submenu_set_header(app->submenu_main, "Web Crawler v0.3");
+    submenu_set_header(app->submenu_config, "Settings");
 
-    // Add items to Submenu
-    submenu_add_item(app->submenu, "Run", WebCrawlerSubmenuIndexRun, web_crawler_submenu_callback, app);
-    submenu_add_item(app->submenu, "About", WebCrawlerSubmenuIndexAbout, web_crawler_submenu_callback, app);
-    submenu_add_item(app->submenu, "Configure", WebCrawlerSubmenuIndexSetPath, web_crawler_submenu_callback, app);
-    submenu_add_item(app->submenu, "Read File", WebCrawlerSubmenuIndexData, web_crawler_submenu_callback, app);
+    // Add items
+    submenu_add_item(app->submenu_main, "Run", WebCrawlerSubmenuIndexRun, web_crawler_submenu_callback, app);
+    submenu_add_item(app->submenu_main, "About", WebCrawlerSubmenuIndexAbout, web_crawler_submenu_callback, app);
+    submenu_add_item(app->submenu_main, "Settings", WebCrawlerSubmenuIndexConfig, web_crawler_submenu_callback, app);
+
+    submenu_add_item(app->submenu_config, "WiFi", WebCrawlerSubmenuIndexWifi, web_crawler_submenu_callback, app);
+    submenu_add_item(app->submenu_config, "File", WebCrawlerSubmenuIndexFile, web_crawler_submenu_callback, app);
+    submenu_add_item(app->submenu_config, "Request", WebCrawlerSubmenuIndexRequest, web_crawler_submenu_callback, app);
 
     // Set previous callback for Submenu
-    view_set_previous_callback(submenu_get_view(app->submenu), web_crawler_exit_app_callback);
+    view_set_previous_callback(submenu_get_view(app->submenu_main), web_crawler_exit_app_callback);       // Exit App
+    view_set_previous_callback(submenu_get_view(app->submenu_config), web_crawler_back_to_main_callback); // Back to Main
 
     // Add Submenu view to ViewDispatcher
-    view_dispatcher_add_view(
-        app->view_dispatcher,
-        WebCrawlerViewSubmenu,
-        submenu_get_view(app->submenu));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewSubmenuMain, submenu_get_view(app->submenu_main));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig, submenu_get_view(app->submenu_config));
+
+    //---------------------------------------------------------->
 
     // Allocate Main view
     app->view_main = view_alloc();
-    if (!app->view_main)
+    app->view_run = view_alloc();
+    if (!app->view_main || !app->view_run)
     {
-        free_all(app, "Failed to allocate Main view");
+        free_all(app, "Failed to allocate Views");
         return NULL;
     }
 
-    view_set_draw_callback(app->view_main, web_crawler_view_draw_callback);
-    view_set_previous_callback(app->view_main, web_crawler_back_to_main_callback);
+    // view_set_draw_callback(app->view_main, web_crawler_view_draw_callback);
+    view_set_previous_callback(app->view_main, web_crawler_exit_app_callback);
+
+    view_set_draw_callback(app->view_run, web_crawler_view_draw_callback);
+    view_set_previous_callback(app->view_run, web_crawler_back_to_main_callback);
 
     // Add Main view to ViewDispatcher
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewRun, app->view_main);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewMain, app->view_main);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewRun, app->view_run);
 
     //-- WIDGET ABOUT VIEW --
 
     // Allocate and add About view
     app->widget_about = widget_alloc();
-    if (!app->widget_about)
+    app->widget_file_read = widget_alloc();
+    app->widget_file_delete = widget_alloc();
+    if (!app->widget_about || !app->widget_file_read || !app->widget_file_delete)
     {
-        FURI_LOG_E(TAG, "Failed to allocate About widget");
-        free_all(app, "Failed to allocate About widget");
+        FURI_LOG_E(TAG, "Failed to allocate Widget");
+        free_all(app, "Failed to allocate Widget");
         return NULL;
     }
 
     // Reset the widget before adding elements
     widget_reset(app->widget_about);
+    widget_reset(app->widget_file_read);
+    widget_reset(app->widget_file_delete);
 
-    widget_add_text_scroll_element(
-        app->widget_about,
-        0,
-        0,
-        128,
-        64,
-        "Web Crawler App\n"
-        "---\n"
-        "This is a web crawler app for Flipper Zero.\n"
-        "---\n"
-        "Visit github.com/jblanked for more details.\n"
-        "---\n"
-        "Press BACK to return.");
+    widget_add_text_scroll_element(app->widget_about, 0, 0, 128, 64, "Web Crawler App\n"
+                                                                     "---\n"
+                                                                     "This is a web crawler app for Flipper Zero.\n"
+                                                                     "---\n"
+                                                                     "Visit github.com/jblanked for more details.\n"
+                                                                     "---\n"
+                                                                     "Press BACK to return.");
+
+    widget_add_text_scroll_element(app->widget_file_read, 0, 0, 128, 64, "Data will be displayed here.");
+    widget_add_text_scroll_element(app->widget_file_delete, 0, 0, 128, 64, "File deleted.");
 
     view_set_previous_callback(widget_get_view(app->widget_about), web_crawler_back_to_main_callback);
     view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewAbout, widget_get_view(app->widget_about));
 
-    //-- TEXTBOX DATA VIEW --
-    app->textbox = widget_alloc();
-    if (!app->textbox)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate Textbox");
-        free_all(app, "Failed to allocate Textbox");
-        return NULL;
-    }
+    view_set_previous_callback(widget_get_view(app->widget_file_read), web_crawler_back_to_file_callback);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewFileRead, widget_get_view(app->widget_file_read));
 
-    widget_reset(app->textbox);
-
-    widget_add_text_scroll_element(
-        app->textbox,
-        0,
-        0,
-        128,
-        64, "Data will be displayed here.");
-
-    view_set_previous_callback(widget_get_view(app->textbox), web_crawler_back_to_main_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewData, widget_get_view(app->textbox));
+    view_set_previous_callback(widget_get_view(app->widget_file_delete), web_crawler_back_to_file_callback);
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewFileDelete, widget_get_view(app->widget_file_delete));
 
     // Load Settings and Update Views
-    if (!load_settings(app->path, app->temp_buffer_size_path, app->ssid, app->temp_buffer_size_ssid, app->password, app->temp_buffer_size_password, app))
+    if (!load_settings(app->path, app->temp_buffer_size_path, app->ssid, app->temp_buffer_size_ssid, app->password, app->temp_buffer_size_password, app->file_rename, app->temp_buffer_size_file_rename, app->file_type, app->temp_buffer_size_file_type, app))
     {
         FURI_LOG_E(TAG, "Failed to load settings");
     }
@@ -352,7 +353,7 @@ static WebCrawlerApp *web_crawler_app_alloc()
     app_instance = app;
 
     // Start with the Submenu view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewSubmenu);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewSubmenuMain);
 
     return app;
 }
