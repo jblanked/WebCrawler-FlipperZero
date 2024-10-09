@@ -1,5 +1,6 @@
 #ifndef WEB_CRAWLER_I_H
 #define WEB_CRAWLER_I_H
+
 /**
  * @brief      Function to allocate resources for the WebCrawlerApp.
  * @return     Pointer to the initialized WebCrawlerApp, or NULL on failure.
@@ -42,7 +43,6 @@ WebCrawlerApp *web_crawler_app_alloc()
     if (!flipper_http_init(flipper_http_rx_callback, app))
     {
         FURI_LOG_E(TAG, "Failed to initialize UART");
-        free_all(app, "Failed to initialize UART");
         return NULL;
     }
 
@@ -149,13 +149,72 @@ WebCrawlerApp *web_crawler_app_alloc()
     }
     app->file_rename[0] = '\0';
 
+    // Allocate and initialize temp_buffer_http_method
+    app->temp_buffer_size_http_method = 128;
+    app->temp_buffer_http_method = malloc(app->temp_buffer_size_http_method);
+    if (!app->temp_buffer_http_method)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_http_method");
+        free_all(app, "Failed to allocate temp_buffer_http_method");
+        return NULL;
+    }
+
+    // Allocate http_method
+    app->http_method = malloc(app->temp_buffer_size_http_method);
+    if (!app->http_method)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate http_method");
+        free_all(app, "Failed to allocate http_method");
+        return NULL;
+    }
+
+    // Allocate and initialize temp_buffer_headers
+    app->temp_buffer_size_headers = 256;
+    app->temp_buffer_headers = malloc(app->temp_buffer_size_headers);
+    if (!app->temp_buffer_headers)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_headers");
+        free_all(app, "Failed to allocate temp_buffer_headers");
+        return NULL;
+    }
+
+    // Allocate headers
+    app->headers = malloc(app->temp_buffer_size_headers);
+    if (!app->headers)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate headers");
+        free_all(app, "Failed to allocate headers");
+        return NULL;
+    }
+
+    // Allocate and initialize temp_buffer_payload
+    app->temp_buffer_size_payload = 128;
+    app->temp_buffer_payload = malloc(app->temp_buffer_size_payload);
+    if (!app->temp_buffer_payload)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_payload");
+        free_all(app, "Failed to allocate temp_buffer_payload");
+        return NULL;
+    }
+
+    // Allocate payload
+    app->payload = malloc(app->temp_buffer_size_payload);
+    if (!app->payload)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate payload");
+        free_all(app, "Failed to allocate payload");
+        return NULL;
+    }
+
     // Allocate TextInput views
-    app->text_input_path = text_input_alloc();
-    app->text_input_ssid = text_input_alloc();
-    app->text_input_password = text_input_alloc();
-    app->text_input_file_type = text_input_alloc();
-    app->text_input_file_rename = text_input_alloc();
-    if (!app->text_input_path || !app->text_input_ssid || !app->text_input_password || !app->text_input_file_type || !app->text_input_file_rename)
+    app->text_input_path = uart_text_input_alloc();
+    app->text_input_ssid = uart_text_input_alloc();
+    app->text_input_password = uart_text_input_alloc();
+    app->text_input_file_type = uart_text_input_alloc();
+    app->text_input_file_rename = uart_text_input_alloc();
+    app->text_input_headers = uart_text_input_alloc();
+    app->text_input_payload = uart_text_input_alloc();
+    if (!app->text_input_path || !app->text_input_ssid || !app->text_input_password || !app->text_input_file_type || !app->text_input_file_rename || !app->text_input_headers || !app->text_input_payload)
     {
         FURI_LOG_E(TAG, "Failed to allocate TextInput");
         free_all(app, "Failed to allocate TextInput");
@@ -163,18 +222,22 @@ WebCrawlerApp *web_crawler_app_alloc()
     }
 
     // Add TextInput views with unique view IDs
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInput, text_input_get_view(app->text_input_path));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputSSID, text_input_get_view(app->text_input_ssid));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPassword, text_input_get_view(app->text_input_password));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileType, text_input_get_view(app->text_input_file_type));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename, text_input_get_view(app->text_input_file_rename));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInput, uart_text_input_get_view(app->text_input_path));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputSSID, uart_text_input_get_view(app->text_input_ssid));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPassword, uart_text_input_get_view(app->text_input_password));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileType, uart_text_input_get_view(app->text_input_file_type));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename, uart_text_input_get_view(app->text_input_file_rename));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputHeaders, uart_text_input_get_view(app->text_input_headers));
+    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPayload, uart_text_input_get_view(app->text_input_payload));
 
     // Set previous callback for TextInput views to return to Configure screen
-    view_set_previous_callback(text_input_get_view(app->text_input_path), web_crawler_back_to_request_callback);
-    view_set_previous_callback(text_input_get_view(app->text_input_ssid), web_crawler_back_to_wifi_callback);
-    view_set_previous_callback(text_input_get_view(app->text_input_password), web_crawler_back_to_wifi_callback);
-    view_set_previous_callback(text_input_get_view(app->text_input_file_type), web_crawler_back_to_file_callback);
-    view_set_previous_callback(text_input_get_view(app->text_input_file_rename), web_crawler_back_to_file_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_path), web_crawler_back_to_request_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_headers), web_crawler_back_to_request_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_payload), web_crawler_back_to_request_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_ssid), web_crawler_back_to_wifi_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_password), web_crawler_back_to_wifi_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_file_type), web_crawler_back_to_file_callback);
+    view_set_previous_callback(uart_text_input_get_view(app->text_input_file_rename), web_crawler_back_to_file_callback);
 
     // Allocate Configuration screen
     app->variable_item_list_wifi = variable_item_list_alloc();
@@ -192,6 +255,9 @@ WebCrawlerApp *web_crawler_app_alloc()
 
     // Add item to the configuration screen
     app->path_item = variable_item_list_add(app->variable_item_list_request, "Path", 0, NULL, NULL);
+    app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 3, web_crawler_http_method_change, app);
+    app->headers_item = variable_item_list_add(app->variable_item_list_request, "Headers", 0, NULL, NULL);
+    app->payload_item = variable_item_list_add(app->variable_item_list_request, "Payload", 0, NULL, NULL);
     //
     app->ssid_item = variable_item_list_add(app->variable_item_list_wifi, "SSID", 0, NULL, NULL);         // index 0
     app->password_item = variable_item_list_add(app->variable_item_list_wifi, "Password", 0, NULL, NULL); // index 1
@@ -201,13 +267,16 @@ WebCrawlerApp *web_crawler_app_alloc()
     app->file_rename_item = variable_item_list_add(app->variable_item_list_file, "Rename File", 0, NULL, NULL); // index 2
     app->file_delete_item = variable_item_list_add(app->variable_item_list_file, "Delete File", 0, NULL, NULL); // index 3
 
-    if (!app->ssid_item || !app->password_item || !app->file_type_item || !app->file_rename_item || !app->path_item || !app->file_read_item || !app->file_delete_item)
+    if (!app->ssid_item || !app->password_item || !app->file_type_item || !app->file_rename_item || !app->path_item || !app->file_read_item || !app->file_delete_item || !app->http_method_item || !app->headers_item || !app->payload_item)
     {
         free_all(app, "Failed to add items to VariableItemList");
         return NULL;
     }
 
     variable_item_set_current_value_text(app->path_item, "");        // Initialize
+    variable_item_set_current_value_text(app->http_method_item, ""); // Initialize
+    variable_item_set_current_value_text(app->headers_item, "");     // Initialize
+    variable_item_set_current_value_text(app->payload_item, "");     // Initialize
     variable_item_set_current_value_text(app->ssid_item, "");        // Initialize
     variable_item_set_current_value_text(app->password_item, "");    // Initialize
     variable_item_set_current_value_text(app->file_type_item, "");   // Initialize
@@ -242,7 +311,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     }
 
     // Set header
-    submenu_set_header(app->submenu_main, "Web Crawler v0.3");
+    submenu_set_header(app->submenu_main, "Web Crawler v0.4");
     submenu_set_header(app->submenu_config, "Settings");
 
     // Add items
@@ -322,7 +391,24 @@ WebCrawlerApp *web_crawler_app_alloc()
     view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewFileDelete, widget_get_view(app->widget_file_delete));
 
     // Load Settings and Update Views
-    if (!load_settings(app->path, app->temp_buffer_size_path, app->ssid, app->temp_buffer_size_ssid, app->password, app->temp_buffer_size_password, app->file_rename, app->temp_buffer_size_file_rename, app->file_type, app->temp_buffer_size_file_type, app))
+    if (!load_settings(
+            app->path,
+            app->temp_buffer_size_path,
+            app->ssid,
+            app->temp_buffer_size_ssid,
+            app->password,
+            app->temp_buffer_size_password,
+            app->file_rename,
+            app->temp_buffer_size_file_rename,
+            app->file_type,
+            app->temp_buffer_size_file_type,
+            app->http_method,
+            app->temp_buffer_size_http_method,
+            app->headers,
+            app->temp_buffer_size_headers,
+            app->payload,
+            app->temp_buffer_size_payload,
+            app))
     {
         FURI_LOG_E(TAG, "Failed to load settings");
     }
@@ -345,6 +431,51 @@ WebCrawlerApp *web_crawler_app_alloc()
         else
         {
             variable_item_set_current_value_text(app->ssid_item, ""); // Initialize
+        }
+
+        if (app->file_type[0] != '\0')
+        {
+            variable_item_set_current_value_text(app->file_type_item, app->file_type);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->file_type_item, ".txt"); // Initialize
+        }
+
+        if (app->file_rename[0] != '\0')
+        {
+            variable_item_set_current_value_text(app->file_rename_item, app->file_rename);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->file_rename_item, "received_data"); // Initialize
+        }
+
+        if (app->http_method[0] != '\0')
+        {
+            variable_item_set_current_value_text(app->http_method_item, app->http_method);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->http_method_item, "GET"); // Initialize
+        }
+
+        if (app->headers[0] != '\0')
+        {
+            variable_item_set_current_value_text(app->headers_item, app->headers);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->headers_item, "{\n\t\"Content-Type\": \"application/json\"\n}"); // Initialize
+        }
+
+        if (app->payload[0] != '\0')
+        {
+            variable_item_set_current_value_text(app->payload_item, app->payload);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->payload_item, "{\n\t\"key\": \"value\"\n}"); // Initialize
         }
 
         // Password handling can be omitted for security or handled securely

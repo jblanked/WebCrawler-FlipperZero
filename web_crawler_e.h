@@ -16,6 +16,7 @@
 #include <storage/storage.h>
 
 #define TAG "WebCrawler"
+static char *http_method_names[] = {"GET", "POST", "PUT"};
 
 // Define the submenu items for our WebCrawler application
 typedef enum
@@ -44,6 +45,8 @@ typedef enum
     WebCrawlerViewFileRead,                // Text input for File Read
     WebCrawlerViewTextInputFileType,       // Text input for File Type
     WebCrawlerViewTextInputFileRename,     // Text input for File Rename
+    WebCrawlerViewTextInputHeaders,        // Text input for Headers
+    WebCrawlerViewTextInputPayload,        // Text input for Payload
     WebCrawlerViewFileDelete,              // File Delete
 } WebCrawlerViewIndex;
 
@@ -57,11 +60,14 @@ typedef struct
     Submenu *submenu_config;
     Widget *widget_about;
 
-    TextInput *text_input_path;
-    TextInput *text_input_ssid;
-    TextInput *text_input_password;
-    TextInput *text_input_file_type;
-    TextInput *text_input_file_rename;
+    UART_TextInput *text_input_path;
+    UART_TextInput *text_input_ssid;
+    UART_TextInput *text_input_password;
+    UART_TextInput *text_input_file_type;
+    UART_TextInput *text_input_file_rename;
+    //
+    UART_TextInput *text_input_headers;
+    UART_TextInput *text_input_payload;
 
     Widget *widget_file_read;
     Widget *widget_file_delete;
@@ -77,12 +83,19 @@ typedef struct
     VariableItem *file_rename_item;
     VariableItem *file_read_item;
     VariableItem *file_delete_item;
+    //
+    VariableItem *http_method_item;
+    VariableItem *headers_item;
+    VariableItem *payload_item;
 
     char *path;
     char *ssid;
     char *password;
     char *file_type;
     char *file_rename;
+    char *http_method;
+    char *headers;
+    char *payload;
 
     char *temp_buffer_path;
     uint32_t temp_buffer_size_path;
@@ -98,5 +111,14 @@ typedef struct
 
     char *temp_buffer_file_rename;
     uint32_t temp_buffer_size_file_rename;
+
+    char *temp_buffer_http_method;
+    uint32_t temp_buffer_size_http_method;
+
+    char *temp_buffer_headers;
+    uint32_t temp_buffer_size_headers;
+
+    char *temp_buffer_payload;
+    uint32_t temp_buffer_size_payload;
 } WebCrawlerApp;
 #endif // WEB_CRAWLER_E

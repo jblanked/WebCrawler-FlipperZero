@@ -1,3 +1,9 @@
+## 0.4 (New Keyboard and HTTP Methods)
+- Updated the text input to match the text input from the UART Terminal app (big thanks to xMasterx)
+- Added POST and PUT requests (with payloads)
+- Added headers
+- Added more error handling
+
 ## 0.3 (New Features)
 - Updated the progress messages displayed after sending a GET request.
 - Renamed the "Config" main submenu option to "Settings."

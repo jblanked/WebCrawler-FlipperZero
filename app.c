@@ -1,3 +1,4 @@
+#include <uart_text_input.h>
 #include <web_crawler_e.h>
 #include <flipper_http.h>
 #include <web_crawler_storage.h>
@@ -24,6 +25,7 @@ int32_t web_crawler_app(void *p)
     if (!flipper_http_connect_wifi())
     {
         FURI_LOG_E(TAG, "Failed to connect to WiFi");
+        return -1;
     }
 
     if (!flipper_http_ping())

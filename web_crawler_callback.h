@@ -1,17 +1,42 @@
 // web_crawler_callback.h
-static bool sent_get_request = false;
+static bool sent_http_request = false;
 static bool get_success = false;
 static bool already_success = false;
 static WebCrawlerApp *app_instance = NULL;
 
 // Forward declaration of callback functions
 static void web_crawler_setting_item_path_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_headers_clicked(void *context, uint32_t index);
+static void web_crawler_setting_item_payload_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_password_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index);
 static void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index);
+
+static void web_crawler_http_method_change(VariableItem *item)
+{
+    uint8_t index = variable_item_get_current_value_index(item);
+    variable_item_set_current_value_text(item, http_method_names[index]);
+
+    // save the http method
+    if (app_instance)
+    {
+        strncpy(app_instance->http_method, http_method_names[index], strlen(http_method_names[index]) + 1);
+
+        // save the settings
+        save_settings(
+            app_instance->path,
+            app_instance->ssid,
+            app_instance->password,
+            app_instance->file_rename,
+            app_instance->file_type,
+            app_instance->http_method,
+            app_instance->headers,
+            app_instance->payload);
+    }
+}
 
 static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
 {
@@ -43,13 +68,50 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
 
     if (app_instance->path)
     {
-        if (!sent_get_request)
+        if (!sent_http_request)
         {
+            if (strstr(app_instance->http_method, "GET") != NULL)
+            {
+                canvas_draw_str(canvas, 0, 10, "Sending GET request...");
 
-            canvas_draw_str(canvas, 0, 10, "Sending GET request...");
+                // Perform GET request and handle the response
+                if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
+                {
+                    get_success = flipper_http_get_request(app_instance->path);
+                }
+                else
+                {
+                    get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
+                }
+            }
+            else if (strstr(app_instance->http_method, "POST") != NULL)
+            {
+                canvas_draw_str(canvas, 0, 10, "Sending POST request...");
 
-            // Perform GET request and handle the response
-            get_success = flipper_http_get_request(app_instance->path);
+                // Perform POST request and handle the response
+                get_success = flipper_http_post_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+            }
+            else if (strstr(app_instance->http_method, "PUT") != NULL)
+            {
+                canvas_draw_str(canvas, 0, 10, "Sending PUT request...");
+
+                // Perform PUT request and handle the response
+                get_success = flipper_http_put_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+            }
+            else
+            {
+                canvas_draw_str(canvas, 0, 10, "Sending GET request...");
+
+                // Perform GET request and handle the response
+                if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
+                {
+                    get_success = flipper_http_get_request(app_instance->path);
+                }
+                else
+                {
+                    get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
+                }
+            }
 
             canvas_draw_str(canvas, 0, 20, "Sent!");
 
@@ -64,7 +126,7 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                 canvas_draw_str(canvas, 0, 30, "Failed.");
             }
 
-            sent_get_request = true;
+            sent_http_request = true;
         }
         else
         {
@@ -105,7 +167,7 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                 }
                 else
                 {
-                    canvas_draw_str(canvas, 0, 10, "GET request failed.");
+                    canvas_draw_str(canvas, 0, 10, "HTTP request failed.");
                     canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
                 }
                 get_success = false;
@@ -143,7 +205,7 @@ static uint32_t web_crawler_back_to_main_callback(void *context)
 {
     UNUSED(context);
     // reset GET request flags
-    sent_get_request = false;
+    sent_http_request = false;
     get_success = false;
     already_success = false;
     // free file read widget if it exists
@@ -197,7 +259,7 @@ static void web_crawler_submenu_callback(void *context, uint32_t index)
         switch (index)
         {
         case WebCrawlerSubmenuIndexRun:
-            sent_get_request = false; // Reset the flag
+            sent_http_request = false; // Reset the flag
             view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewRun);
             break;
         case WebCrawlerSubmenuIndexAbout:
@@ -282,6 +344,17 @@ static void web_crawler_request_enter_callback(void *context, uint32_t index)
     case 0: // URL
         web_crawler_setting_item_path_clicked(context, index);
         break;
+    case 1:
+        // HTTP Method
+        break;
+    case 2:
+        // Headers
+        web_crawler_setting_item_headers_clicked(context, index);
+        break;
+    case 3:
+        // Payload
+        web_crawler_setting_item_payload_clicked(context, index);
+        break;
     default:
         FURI_LOG_E(TAG, "Unknown configuration item index");
         break;
@@ -313,16 +386,71 @@ static void web_crawler_set_path_updated(void *context)
         variable_item_set_current_value_text(app->path_item, app->path);
 
         // Save the URL to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
+    }
 
-        // send to UART
-        if (!flipper_http_save_wifi(app->ssid, app->password))
-        {
-            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
-            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
-        }
+    // Return to the Configure view
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+}
 
-        FURI_LOG_D(TAG, "URL saved: %s", app->path);
+/**
+ * @brief      Callback for when the user finishes entering the headers
+ * @param      context   The context - WebCrawlerApp object.
+ */
+static void web_crawler_set_headers_updated(void *context)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_headers || !app->temp_buffer_size_headers || !app->headers_item)
+    {
+        FURI_LOG_E(TAG, "Invalid headers buffer");
+        return;
+    }
+    // Store the entered headers from temp_buffer_headers to headers
+    strncpy(app->headers, app->temp_buffer_headers, app->temp_buffer_size_headers - 1);
+
+    if (app->headers_item)
+    {
+        variable_item_set_current_value_text(app->headers_item, app->headers);
+
+        // Save the headers to the settings
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
+    }
+
+    // Return to the Configure view
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+}
+
+/**
+ * @brief      Callback for when the user finishes entering the payload.
+ * @param      context   The context - WebCrawlerApp object.
+ */
+static void web_crawler_set_payload_updated(void *context)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    if (!app->temp_buffer_payload || !app->temp_buffer_size_payload || !app->payload_item)
+    {
+        FURI_LOG_E(TAG, "Invalid payload buffer");
+        return;
+    }
+    // Store the entered payload from temp_buffer_payload to payload
+    strncpy(app->payload, app->temp_buffer_payload, app->temp_buffer_size_payload - 1);
+
+    if (app->payload_item)
+    {
+        variable_item_set_current_value_text(app->payload_item, app->payload);
+
+        // Save the payload to the settings
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
 
     // Return to the Configure view
@@ -354,7 +482,7 @@ static void web_crawler_set_ssid_updated(void *context)
         variable_item_set_current_value_text(app->ssid_item, app->ssid);
 
         // Save the SSID to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
         if (!flipper_http_save_wifi(app->ssid, app->password))
@@ -395,7 +523,7 @@ static void web_crawler_set_password_update(void *context)
         variable_item_set_current_value_text(app->password_item, app->password);
 
         // Save the Password to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type);
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
         if (!flipper_http_save_wifi(app->ssid, app->password))
@@ -438,6 +566,9 @@ static void web_crawler_set_file_type_update(void *context)
     if (app->file_type_item)
     {
         variable_item_set_current_value_text(app->file_type_item, app->file_type);
+
+        // Save the File Type to the settings
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
 
     rename_received_data(app->file_rename, app->file_rename, app->file_type, old_file_type);
@@ -477,6 +608,9 @@ static void web_crawler_set_file_rename_update(void *context)
     if (app->file_rename_item)
     {
         variable_item_set_current_value_text(app->file_rename_item, app->file_rename);
+
+        // Save the File Rename to the settings
+        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
 
     rename_received_data(old_name, app->file_rename, app->file_type, app->file_type);
@@ -506,7 +640,7 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 
     UNUSED(index);
     // Set up the text input
-    text_input_set_header_text(app->text_input_path, "Enter URL");
+    uart_text_input_set_header_text(app->text_input_path, "Enter URL");
 
     // Initialize temp_buffer with existing path
     if (app->path && strlen(app->path) > 0)
@@ -515,14 +649,14 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
     }
     else
     {
-        strncpy(app->temp_buffer_path, "https://www.google.com/", app->temp_buffer_size_path - 1);
+        strncpy(app->temp_buffer_path, "https://httpbin.org/get", app->temp_buffer_size_path - 1);
     }
 
     app->temp_buffer_path[app->temp_buffer_size_path - 1] = '\0';
 
     // Configure the text input
     bool clear_previous_text = false;
-    text_input_set_result_callback(
+    uart_text_input_set_result_callback(
         app->text_input_path,
         web_crawler_set_path_updated,
         app,
@@ -532,11 +666,127 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        text_input_get_view(app->text_input_path),
+        uart_text_input_get_view(app->text_input_path),
         web_crawler_back_to_request_callback);
 
     // Show text input dialog
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInput);
+}
+
+/**
+ * @brief      Handler for headers configuration item click.
+ * @param      context  The context - WebCrawlerApp object.
+ * @param      index    The index of the item that was clicked.
+ */
+static void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+    if (!app->text_input_headers)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
+    if (!app->headers)
+    {
+        FURI_LOG_E(TAG, "Headers is NULL");
+        return;
+    }
+    if (!app->temp_buffer_headers)
+    {
+        FURI_LOG_E(TAG, "Temp buffer headers is NULL");
+        return;
+    }
+    // Set up the text input
+    uart_text_input_set_header_text(app->text_input_headers, "Enter Headers");
+
+    // Initialize temp_buffer with existing headers
+    if (app->headers && strlen(app->headers) > 0)
+    {
+        strncpy(app->temp_buffer_headers, app->headers, app->temp_buffer_size_headers - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_headers, "{\"Content-Type\":\"application/json\",\"key\":\"value\"}", app->temp_buffer_size_headers - 1);
+    }
+
+    app->temp_buffer_headers[app->temp_buffer_size_headers - 1] = '\0';
+
+    // Configure the text input
+    bool clear_previous_text = false;
+    uart_text_input_set_result_callback(
+        app->text_input_headers,
+        web_crawler_set_headers_updated,
+        app,
+        app->temp_buffer_headers,
+        app->temp_buffer_size_headers,
+        clear_previous_text);
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        uart_text_input_get_view(app->text_input_headers),
+        web_crawler_back_to_request_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputHeaders);
+}
+
+/**
+ * @brief      Handler for payload configuration item click.
+ * @param      context  The context - WebCrawlerApp object.
+ * @param      index    The index of the item that was clicked.
+ */
+static void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
+{
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    if (!app)
+    {
+        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
+        return;
+    }
+    UNUSED(index);
+    if (!app->text_input_payload)
+    {
+        FURI_LOG_E(TAG, "Text input is NULL");
+        return;
+    }
+    // Set up the text input
+    uart_text_input_set_header_text(app->text_input_payload, "Enter Payload");
+
+    // Initialize temp_buffer with existing payload
+    if (app->payload && strlen(app->payload) > 0)
+    {
+        strncpy(app->temp_buffer_payload, app->payload, app->temp_buffer_size_payload - 1);
+    }
+    else
+    {
+        strncpy(app->temp_buffer_payload, "{\"key\":\"value\"}", app->temp_buffer_size_payload - 1);
+    }
+
+    app->temp_buffer_payload[app->temp_buffer_size_payload - 1] = '\0';
+
+    // Configure the text input
+    bool clear_previous_text = false;
+    uart_text_input_set_result_callback(
+        app->text_input_payload,
+        web_crawler_set_payload_updated,
+        app,
+        app->temp_buffer_payload,
+        app->temp_buffer_size_payload,
+        clear_previous_text);
+
+    // Set the previous callback to return to Configure screen
+    view_set_previous_callback(
+        uart_text_input_get_view(app->text_input_payload),
+        web_crawler_back_to_request_callback);
+
+    // Show text input dialog
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputPayload);
 }
 
 /**
@@ -559,7 +809,7 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
         return;
     }
     // Set up the text input
-    text_input_set_header_text(app->text_input_ssid, "Enter SSID");
+    uart_text_input_set_header_text(app->text_input_ssid, "Enter SSID");
 
     // Initialize temp_buffer with existing SSID
     if (app->ssid && strlen(app->ssid) > 0)
@@ -568,14 +818,14 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
     }
     else
     {
-        strncpy(app->temp_buffer_ssid, "SSID-2G-", app->temp_buffer_size_ssid - 1);
+        strncpy(app->temp_buffer_ssid, "", app->temp_buffer_size_ssid - 1);
     }
 
     app->temp_buffer_ssid[app->temp_buffer_size_ssid - 1] = '\0';
 
     // Configure the text input
     bool clear_previous_text = false;
-    text_input_set_result_callback(
+    uart_text_input_set_result_callback(
         app->text_input_ssid,
         web_crawler_set_ssid_updated,
         app,
@@ -585,7 +835,7 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        text_input_get_view(app->text_input_ssid),
+        uart_text_input_get_view(app->text_input_ssid),
         web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
@@ -612,7 +862,7 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
         return;
     }
     // Set up the text input
-    text_input_set_header_text(app->text_input_password, "Enter Password");
+    uart_text_input_set_header_text(app->text_input_password, "Enter Password");
 
     // Initialize temp_buffer with existing password
     strncpy(app->temp_buffer_password, app->password, app->temp_buffer_size_password - 1);
@@ -620,7 +870,7 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
 
     // Configure the text input
     bool clear_previous_text = false;
-    text_input_set_result_callback(
+    uart_text_input_set_result_callback(
         app->text_input_password,
         web_crawler_set_password_update,
         app,
@@ -630,7 +880,7 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        text_input_get_view(app->text_input_password),
+        uart_text_input_get_view(app->text_input_password),
         web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
@@ -657,7 +907,7 @@ static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t i
         return;
     }
     // Set up the text input
-    text_input_set_header_text(app->text_input_file_type, "Enter File Type");
+    uart_text_input_set_header_text(app->text_input_file_type, "Enter File Type");
 
     // Initialize temp_buffer with existing file_type
     if (app->file_type && strlen(app->file_type) > 0)
@@ -673,7 +923,7 @@ static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t i
 
     // Configure the text input
     bool clear_previous_text = false;
-    text_input_set_result_callback(
+    uart_text_input_set_result_callback(
         app->text_input_file_type,
         web_crawler_set_file_type_update,
         app,
@@ -683,7 +933,7 @@ static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t i
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        text_input_get_view(app->text_input_file_type),
+        uart_text_input_get_view(app->text_input_file_type),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog
@@ -710,7 +960,7 @@ static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t
         return;
     }
     // Set up the text input
-    text_input_set_header_text(app->text_input_file_rename, "Enter File Rename");
+    uart_text_input_set_header_text(app->text_input_file_rename, "Enter File Rename");
 
     // Initialize temp_buffer with existing file_rename
     if (app->file_rename && strlen(app->file_rename) > 0)
@@ -726,7 +976,7 @@ static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t
 
     // Configure the text input
     bool clear_previous_text = false;
-    text_input_set_result_callback(
+    uart_text_input_set_result_callback(
         app->text_input_file_rename,
         web_crawler_set_file_rename_update,
         app,
@@ -736,7 +986,7 @@ static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        text_input_get_view(app->text_input_file_rename),
+        uart_text_input_get_view(app->text_input_file_rename),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog

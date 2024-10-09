@@ -66,6 +66,42 @@ static void free_buffers(WebCrawlerApp *app)
         free(app->temp_buffer_file_rename);
         app->temp_buffer_file_rename = NULL;
     }
+
+    if (app->temp_buffer_http_method)
+    {
+        free(app->temp_buffer_http_method);
+        app->temp_buffer_http_method = NULL;
+    }
+
+    if (app->temp_buffer_headers)
+    {
+        free(app->temp_buffer_headers);
+        app->temp_buffer_headers = NULL;
+    }
+
+    if (app->temp_buffer_payload)
+    {
+        free(app->temp_buffer_payload);
+        app->temp_buffer_payload = NULL;
+    }
+
+    if (app->http_method)
+    {
+        free(app->http_method);
+        app->http_method = NULL;
+    }
+
+    if (app->headers)
+    {
+        free(app->headers);
+        app->headers = NULL;
+    }
+
+    if (app->payload)
+    {
+        free(app->payload);
+        app->payload = NULL;
+    }
 }
 
 static void free_resources(WebCrawlerApp *app)
@@ -112,15 +148,19 @@ static void free_all(WebCrawlerApp *app, char *reason)
     if (app->widget_file_delete)
         widget_free(app->widget_file_delete);
     if (app->text_input_path)
-        text_input_free(app->text_input_path);
+        uart_text_input_free(app->text_input_path);
     if (app->text_input_ssid)
-        text_input_free(app->text_input_ssid);
+        uart_text_input_free(app->text_input_ssid);
     if (app->text_input_password)
-        text_input_free(app->text_input_password);
+        uart_text_input_free(app->text_input_password);
     if (app->text_input_file_type)
-        text_input_free(app->text_input_file_type);
+        uart_text_input_free(app->text_input_file_type);
     if (app->text_input_file_rename)
-        text_input_free(app->text_input_file_rename);
+        uart_text_input_free(app->text_input_file_rename);
+    if (app->text_input_headers)
+        uart_text_input_free(app->text_input_headers);
+    if (app->text_input_payload)
+        uart_text_input_free(app->text_input_payload);
 
     furi_record_close(RECORD_GUI);
     free_resources(app);
@@ -175,7 +215,7 @@ static void web_crawler_app_free(WebCrawlerApp *app)
         view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig);
         submenu_free(app->submenu_config);
     }
-    // Remove and free Configuration screen
+    // Remove and free Variable Item Lists
     if (app->variable_item_list_wifi)
     {
         view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
@@ -198,6 +238,22 @@ static void web_crawler_app_free(WebCrawlerApp *app)
     view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewTextInputPassword);
     view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewTextInputFileType);
     view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename);
+    view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewTextInputHeaders);
+    view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewTextInputPayload);
+    if (app->text_input_path)
+        uart_text_input_free(app->text_input_path);
+    if (app->text_input_ssid)
+        uart_text_input_free(app->text_input_ssid);
+    if (app->text_input_password)
+        uart_text_input_free(app->text_input_password);
+    if (app->text_input_file_type)
+        uart_text_input_free(app->text_input_file_type);
+    if (app->text_input_file_rename)
+        uart_text_input_free(app->text_input_file_rename);
+    if (app->text_input_headers)
+        uart_text_input_free(app->text_input_headers);
+    if (app->text_input_payload)
+        uart_text_input_free(app->text_input_payload);
 
     // Remove and free Widgets
     if (app->widget_about)

@@ -17,7 +17,15 @@
 #define TRUNCATION_NOTICE "\n\n[Data truncated due to size limits]"
 
 // Function to save settings: path, SSID, and password
-static void save_settings(const char *path, const char *ssid, const char *password, const char *file_rename, const char *file_type)
+static void save_settings(
+    const char *path,
+    const char *ssid,
+    const char *password,
+    const char *file_rename,
+    const char *file_type,
+    const char *http_method,
+    const char *headers,
+    const char *payload)
 {
     // Create the directory for saving settings
     char directory_path[256];
@@ -82,6 +90,30 @@ static void save_settings(const char *path, const char *ssid, const char *passwo
         FURI_LOG_E(TAG, "Failed to write file type");
     }
 
+    // Save the http method length and data
+    size_t http_method_length = strlen(http_method) + 1; // Include null terminator
+    if (storage_file_write(file, &http_method_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, http_method, http_method_length) != http_method_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write http method");
+    }
+
+    // Save the headers length and data
+    size_t headers_length = strlen(headers) + 1; // Include null terminator
+    if (storage_file_write(file, &headers_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, headers, headers_length) != headers_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write headers");
+    }
+
+    // Save the payload length and data
+    size_t payload_length = strlen(payload) + 1; // Include null terminator
+    if (storage_file_write(file, &payload_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, payload, payload_length) != payload_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write payload");
+    }
+
     storage_file_close(file);
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
@@ -99,6 +131,12 @@ static bool load_settings(
     size_t file_rename_size,
     char *file_type,
     size_t file_type_size,
+    char *http_method,
+    size_t http_method_size,
+    char *headers,
+    size_t headers_size,
+    char *payload,
+    size_t payload_size,
     WebCrawlerApp *app)
 {
     if (!app)
@@ -182,12 +220,51 @@ static bool load_settings(
     }
     file_type[file_type_length - 1] = '\0'; // Ensure null-termination
 
+    // Load the http method
+    size_t http_method_length;
+    if (storage_file_read(file, &http_method_length, sizeof(size_t)) != sizeof(size_t) || http_method_length > http_method_size ||
+        storage_file_read(file, http_method, http_method_length) != http_method_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read http method");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Load the headers
+    size_t headers_length;
+    if (storage_file_read(file, &headers_length, sizeof(size_t)) != sizeof(size_t) || headers_length > headers_size ||
+        storage_file_read(file, headers, headers_length) != headers_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read headers");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Load the payload
+    size_t payload_length;
+    if (storage_file_read(file, &payload_length, sizeof(size_t)) != sizeof(size_t) || payload_length > payload_size ||
+        storage_file_read(file, payload, payload_length) != payload_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read payload");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
     // set the path, ssid, and password
     strncpy(app->path, path, path_size);
     strncpy(app->ssid, ssid, ssid_size);
     strncpy(app->password, password, password_size);
     strncpy(app->file_rename, file_rename, file_rename_size);
     strncpy(app->file_type, file_type, file_type_size);
+    strncpy(app->http_method, http_method, http_method_size);
+    strncpy(app->headers, headers, headers_size);
+    strncpy(app->payload, payload, payload_size);
 
     storage_file_close(file);
     storage_file_free(file);
