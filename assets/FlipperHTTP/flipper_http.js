@@ -133,6 +133,72 @@ let fhttp = {
         this.clear_buffer(); // Clear the buffer
         return "";
     },
+    // another GET request but with headers
+    get_request_with_headers: function (url, headers) {
+        serial.write('[GET/HTTP]{url:"' + url + '",headers:' + headers + '}');
+        if (this.read_data(500) === "[GET/SUCCESS] GET request successful.") {
+            print("GET request successful");
+            while (true) {
+                let line = this.read_data(500);
+                if (line === "[GET/END]") {
+                    break;
+                }
+                if (line !== undefined) {
+                    this.clear_buffer(false); // Clear the buffer
+                    return line;
+                }
+            }
+        }
+        else {
+            print("GET request failed");
+        }
+        this.clear_buffer(); // Clear the buffer
+        return "";
+    },
+    // send POST request with headers
+    post_request_with_headers: function (url, headers, data) {
+        serial.write('[POST/HTTP]{"url":"' + url + '","headers":' + headers + ',"payload":' + data + '}');
+        if (this.read_data(500) === "[POST/SUCCESS] POST request successful.") {
+            print("POST request successful");
+            while (true) {
+                let line = this.read_data(500);
+                if (line === "[POST/END]") {
+                    break;
+                }
+                if (line !== undefined) {
+                    this.clear_buffer(false); // Clear the buffer
+                    return line;
+                }
+            }
+        }
+        else {
+            print("POST request failed");
+        }
+        this.clear_buffer(); // Clear the buffer
+        return "";
+    },
+    // send PUT request with headers
+    put_request_with_headers: function (url, headers, data) {
+        serial.write('[PUT/HTTP]{"url":"' + url + '","headers":' + headers + ',"payload":' + data + '}');
+        if (this.read_data(500) === "[PUT/SUCCESS] PUT request successful.") {
+            print("PUT request successful");
+            while (true) {
+                let line = this.read_data(500);
+                if (line === "[PUT/END]") {
+                    break;
+                }
+                if (line !== undefined) {
+                    this.clear_buffer(false); // Clear the buffer
+                    return line;
+                }
+            }
+        }
+        else {
+            print("PUT request failed");
+        }
+        this.clear_buffer(); // Clear the buffer
+        return "";
+    },
     // Helper function to check if a string contains another string
     includes: function (text, search) {
         let stringLength = text.length;
@@ -186,7 +252,7 @@ if (response) {
     if (success) {
         textbox.addText("Wifi settings saved\nSending GET request..\n");
         let url = "https://catfact.ninja/fact";
-        let data = fhttp.get_request(url, 0);
+        let data = fhttp.get_request_with_headers(url, '{"User-Agent":"curl/7.64.1","Content-Type":"application/json"}');
         if (data !== undefined && data !== "") {
             textbox.addText("GET request successful!\n\nReturned Data: \n\n" + data + "\n\nDisconnecting from wifi...\n");
             if (fhttp.disconnect_wifi()) {
@@ -222,4 +288,4 @@ delay(5000);
 fhttp.deinit();
 
 textbox.addText("Deinitialized!\n");
-*/
+/*

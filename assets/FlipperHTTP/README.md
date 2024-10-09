@@ -76,3 +76,8 @@ You should be all set. Here's the initial guide: https://www.youtube.com/watch?v
     - `fhttp.read_data(delay_ms)`
 - GET request:
     - `fhttp.get_request(url)`
+    - `fhttp.get_request_with_headers(url, headers)`
+- POST request:
+    - `fhttp.post_request_with_headers(url, headers, payload)`
+- PUT request:
+    - `fhttp.put_request_with_headers(url, headers, payload)`
