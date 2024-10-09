@@ -115,7 +115,6 @@ let fhttp = {
     get_request: function (url) {
         serial.write('[GET]' + url);
         if (this.read_data(500) === "[GET/SUCCESS] GET request successful.") {
-            print("GET request successful");
             while (true) {
                 let line = this.read_data(500);
                 if (line === "[GET/END]") {
@@ -137,7 +136,6 @@ let fhttp = {
     get_request_with_headers: function (url, headers) {
         serial.write('[GET/HTTP]{url:"' + url + '",headers:' + headers + '}');
         if (this.read_data(500) === "[GET/SUCCESS] GET request successful.") {
-            print("GET request successful");
             while (true) {
                 let line = this.read_data(500);
                 if (line === "[GET/END]") {
@@ -159,7 +157,6 @@ let fhttp = {
     post_request_with_headers: function (url, headers, data) {
         serial.write('[POST/HTTP]{"url":"' + url + '","headers":' + headers + ',"payload":' + data + '}');
         if (this.read_data(500) === "[POST/SUCCESS] POST request successful.") {
-            print("POST request successful");
             while (true) {
                 let line = this.read_data(500);
                 if (line === "[POST/END]") {
@@ -181,7 +178,6 @@ let fhttp = {
     put_request_with_headers: function (url, headers, data) {
         serial.write('[PUT/HTTP]{"url":"' + url + '","headers":' + headers + ',"payload":' + data + '}');
         if (this.read_data(500) === "[PUT/SUCCESS] PUT request successful.") {
-            print("PUT request successful");
             while (true) {
                 let line = this.read_data(500);
                 if (line === "[PUT/END]") {
@@ -195,6 +191,27 @@ let fhttp = {
         }
         else {
             print("PUT request failed");
+        }
+        this.clear_buffer(); // Clear the buffer
+        return "";
+    },
+    // send DELETE request with headers
+    delete_request_with_headers: function (url, headers, data) {
+        serial.write('[DELETE/HTTP]{"url":"' + url + '","headers":' + headers + ',"payload":' + data + '}');
+        if (this.read_data(500) === "[DELETE/SUCCESS] DELETE request successful.") {
+            while (true) {
+                let line = this.read_data(500);
+                if (line === "[DELETE/END]") {
+                    break;
+                }
+                if (line !== undefined) {
+                    this.clear_buffer(false); // Clear the buffer
+                    return line;
+                }
+            }
+        }
+        else {
+            print("DELETE request failed");
         }
         this.clear_buffer(); // Clear the buffer
         return "";

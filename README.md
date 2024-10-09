@@ -30,6 +30,7 @@
    - https://httpbin.org/get Returns GET data.
    - https://httpbin.org/post Returns POST data.
    - https://httpbin.org/put Returns PUT data.
+   - https://httpbin.org/delete Returns DELETE data.
 
 5. **Running the Request**: Select **Run** from the main submenu to start the HTTP request process. The app will:
    - **Send Request**: Transmit the HTTP request via serial to the WiFi Dev Board.
@@ -46,7 +47,7 @@
    - Enter the complete URL of the website you intend to crawl (e.g., https://www.example.com/).
 
 2. **HTTP Method**
-   - Choose between GET, POST, and PUT.
+   - Choose between GET, POST, DELETE, and PUT.
 
 3. **Headers**
    - Add your required headers to be used in your HTTP requests

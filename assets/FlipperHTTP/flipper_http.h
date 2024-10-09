@@ -36,6 +36,7 @@ bool flipper_http_get_request(const char *url);
 bool flipper_http_get_request_with_headers(const char *url, const char *headers);
 bool flipper_http_post_request_with_headers(const char *url, const char *headers, const char *payload);
 bool flipper_http_put_request_with_headers(const char *url, const char *headers, const char *payload);
+bool flipper_http_delete_request_with_headers(const char *url, const char *headers, const char *payload);
 //---
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[]);
 
@@ -89,6 +90,9 @@ typedef struct
 
     bool started_receiving_put; // Indicates if a PUT request has started
     bool just_started_put;      // Indicates if PUT data reception has just started
+
+    bool started_receiving_delete; // Indicates if a DELETE request has started
+    bool just_started_delete;      // Indicates if DELETE data reception has just started
 } FlipperHTTP;
 
 // Declare uart as extern to prevent multiple definitions
@@ -104,10 +108,13 @@ static FlipperHTTP fhttp;
 void get_timeout_timer_callback(void *context)
 {
     UNUSED(context);
-    FURI_LOG_E(HTTP_TAG, "Timeout reached: 2 seconds without receiving [GET/END]...");
+    FURI_LOG_E(HTTP_TAG, "Timeout reached: 2 seconds without receiving the end.");
 
     // Reset the state
     fhttp.started_receiving_get = false;
+    fhttp.started_receiving_post = false;
+    fhttp.started_receiving_put = false;
+    fhttp.started_receiving_delete = false;
 
     // Free received data if any
     if (fhttp.received_data)
@@ -274,7 +281,7 @@ bool flipper_http_init(FlipperHTTP_Callback callback, void *context)
 
     if (!fhttp.get_timeout_timer)
     {
-        FURI_LOG_E(HTTP_TAG, "Failed to allocate GET timeout timer.");
+        FURI_LOG_E(HTTP_TAG, "Failed to allocate HTTP request timeout timer.");
         // Cleanup resources
         furi_hal_serial_async_rx_stop(fhttp.serial_handle);
         furi_hal_serial_disable_direction(fhttp.serial_handle, FuriHalSerialDirectionRx);
@@ -620,6 +627,42 @@ bool flipper_http_put_request_with_headers(const char *url, const char *headers,
     // The response will be handled asynchronously via the callback
     return true;
 }
+// Function to send a DELETE request with headers
+/**
+ * @brief      Send a DELETE request to the specified URL.
+ * @return     true if the request was successful, false otherwise.
+ * @param      url  The URL to send the DELETE request to.
+ * @param      headers  The headers to send with the DELETE request.
+ * @param      data  The data to send with the DELETE request.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_delete_request_with_headers(const char *url, const char *headers, const char *payload)
+{
+    if (!url || !headers || !payload)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_delete_request_with_headers.");
+        return false;
+    }
+
+    // Prepare DELETE request command with headers and data
+    char command[256];
+    int ret = snprintf(command, sizeof(command), "[DELETE/HTTP]{\"url\":\"%s\",\"headers\":%s,\"payload\":%s}", url, headers, payload);
+    if (ret < 0 || ret >= (int)sizeof(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to format DELETE request command with headers and data.");
+        return false;
+    }
+
+    // Send DELETE request via UART
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send DELETE request command with headers and data.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
 // Function to handle received data asynchronously
 /**
  * @brief      Callback function to handle received data asynchronously.
@@ -837,6 +880,69 @@ void flipper_http_rx_callback(const char *line, void *context)
         return;
     }
 
+    // Check if we've started receiving data from a DELETE request
+    else if (fhttp.started_receiving_delete)
+    {
+        // Restart the timeout timer each time new data is received
+        furi_timer_restart(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
+
+        if (strstr(line, "[DELETE/END]") != NULL)
+        {
+            FURI_LOG_I(HTTP_TAG, "DELETE request completed.");
+            // Stop the timer since we've completed the DELETE request
+            furi_timer_stop(fhttp.get_timeout_timer);
+
+            if (fhttp.received_data)
+            {
+                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                free(fhttp.received_data);
+                fhttp.received_data = NULL;
+                fhttp.started_receiving_delete = false;
+                fhttp.just_started_delete = false;
+                fhttp.state = IDLE;
+                return;
+            }
+            else
+            {
+                FURI_LOG_E(HTTP_TAG, "No data received.");
+                fhttp.started_receiving_delete = false;
+                fhttp.just_started_delete = false;
+                fhttp.state = IDLE;
+                return;
+            }
+        }
+
+        // Append the new line to the existing data
+        if (fhttp.received_data == NULL)
+        {
+            fhttp.received_data = (char *)malloc(strlen(line) + 2); // +2 for newline and null terminator
+            if (fhttp.received_data)
+            {
+                strcpy(fhttp.received_data, line);
+                fhttp.received_data[strlen(line)] = '\n';     // Add newline
+                fhttp.received_data[strlen(line) + 1] = '\0'; // Null terminator
+            }
+        }
+        else
+        {
+            size_t current_len = strlen(fhttp.received_data);
+            size_t new_size = current_len + strlen(line) + 2; // +2 for newline and null terminator
+            fhttp.received_data = (char *)realloc(fhttp.received_data, new_size);
+            if (fhttp.received_data)
+            {
+                memcpy(fhttp.received_data + current_len, line, strlen(line)); // Copy line at the end of the current data
+                fhttp.received_data[current_len + strlen(line)] = '\n';        // Add newline
+                fhttp.received_data[current_len + strlen(line) + 1] = '\0';    // Null terminator
+            }
+        }
+
+        if (!fhttp.just_started_delete)
+        {
+            fhttp.just_started_delete = true;
+        }
+        return;
+    }
+
     // Handle different types of responses
     if (strstr(line, "[SUCCESS]") != NULL || strstr(line, "[CONNECTED]") != NULL)
     {
@@ -870,6 +976,13 @@ void flipper_http_rx_callback(const char *line, void *context)
     {
         FURI_LOG_I(HTTP_TAG, "PUT request succeeded.");
         fhttp.started_receiving_put = true;
+        fhttp.state = RECEIVING;
+        return;
+    }
+    else if (strstr(line, "[DELETE/SUCCESS]") != NULL)
+    {
+        FURI_LOG_I(HTTP_TAG, "DELETE request succeeded.");
+        fhttp.started_receiving_delete = true;
         fhttp.state = RECEIVING;
         return;
     }

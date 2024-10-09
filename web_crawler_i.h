@@ -255,7 +255,7 @@ WebCrawlerApp *web_crawler_app_alloc()
 
     // Add item to the configuration screen
     app->path_item = variable_item_list_add(app->variable_item_list_request, "Path", 0, NULL, NULL);
-    app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 3, web_crawler_http_method_change, app);
+    app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 4, web_crawler_http_method_change, app);
     app->headers_item = variable_item_list_add(app->variable_item_list_request, "Headers", 0, NULL, NULL);
     app->payload_item = variable_item_list_add(app->variable_item_list_request, "Payload", 0, NULL, NULL);
     //

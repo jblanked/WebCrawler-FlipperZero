@@ -42,6 +42,7 @@ Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and fol
 | `flipper_http_get_request_with_headers`          | `bool`           | `const char *url`, `const char *headers`                                                                       | Sends a GET request with custom headers to the specified URL.                                      |
 | `flipper_http_post_request_with_headers`         | `bool`           | `const char *url`, `const char *headers`, `const char *payload`                                                 | Sends a POST request with custom headers and a payload to the specified URL.                       |
 | `flipper_http_put_request_with_headers`          | `bool`           | `const char *url`, `const char *headers`, `const char *payload`                                                 | Sends a PUT request with custom headers and a payload to the specified URL.                        |
+| `flipper_http_delete_request_with_headers`          | `bool`           | `const char *url`, `const char *headers`, `const char *payload`                                                 | Sends a DELETE request with custom headers and a payload to the specified URL.                        |
 | `flipper_http_save_received_data`                | `bool`           | `size_t bytes_received`, `const char line_buffer[]`                                                            | Saves the received data to the SD card, with the specified size and buffer.                        |
 
 
@@ -60,3 +61,4 @@ Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and fol
 | `fhttp.get_request_with_headers`       | `string`         | `url: string`, `headers: string`                    | Sends a GET request with headers and returns the response of the response.                    |
 | `fhttp.post_request_with_headers`      | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a POST request with headers and payload, and returns the response of the response.       |
 | `fhttp.put_request_with_headers`       | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a PUT request with headers and payload, and returns the response of the response.        |
+| `fhttp.delete_request_with_headers`       | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a PUT request with headers and payload, and returns the response of the response.        |

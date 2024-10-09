@@ -100,17 +100,10 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             }
             else
             {
-                canvas_draw_str(canvas, 0, 10, "Sending GET request...");
+                canvas_draw_str(canvas, 0, 10, "Sending DELETE request...");
 
-                // Perform GET request and handle the response
-                if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
-                {
-                    get_success = flipper_http_get_request(app_instance->path);
-                }
-                else
-                {
-                    get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
-                }
+                // Perform DELETE request and handle the response
+                get_success = flipper_http_delete_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
             }
 
             canvas_draw_str(canvas, 0, 20, "Sent!");

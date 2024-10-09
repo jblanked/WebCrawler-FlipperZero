@@ -16,7 +16,7 @@
 #include <storage/storage.h>
 
 #define TAG "WebCrawler"
-static char *http_method_names[] = {"GET", "POST", "PUT"};
+static char *http_method_names[] = {"GET", "POST", "PUT", "DELETE"};
 
 // Define the submenu items for our WebCrawler application
 typedef enum
