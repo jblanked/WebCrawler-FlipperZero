@@ -680,7 +680,11 @@ void flipper_http_rx_callback(const char *line, void *context)
         return;
     }
 
-    fhttp.last_response = (char *)line;
+    // if line isnt empty save it
+    if (line[0] != '\0')
+    {
+        fhttp.last_response = (char *)line;
+    }
 
     // the only way for the state to change from INACTIVE to RECEIVING is if a PONG is received
     if (fhttp.state != INACTIVE)
@@ -705,7 +709,8 @@ void flipper_http_rx_callback(const char *line, void *context)
 
             if (fhttp.received_data)
             {
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // uncomment if you want to save the received data to the external storage
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 free(fhttp.received_data);
                 fhttp.received_data = NULL;
                 fhttp.started_receiving_get = false;
@@ -768,7 +773,8 @@ void flipper_http_rx_callback(const char *line, void *context)
 
             if (fhttp.received_data)
             {
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // uncomment if you want to save the received data to the external storage
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 free(fhttp.received_data);
                 fhttp.received_data = NULL;
                 fhttp.started_receiving_post = false;
@@ -831,7 +837,8 @@ void flipper_http_rx_callback(const char *line, void *context)
 
             if (fhttp.received_data)
             {
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // uncomment if you want to save the received data to the external storage
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 free(fhttp.received_data);
                 fhttp.received_data = NULL;
                 fhttp.started_receiving_put = false;
@@ -894,7 +901,8 @@ void flipper_http_rx_callback(const char *line, void *context)
 
             if (fhttp.received_data)
             {
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // uncomment if you want to save the received data to the external storage
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 free(fhttp.received_data);
                 fhttp.received_data = NULL;
                 fhttp.started_receiving_delete = false;
@@ -969,6 +977,7 @@ void flipper_http_rx_callback(const char *line, void *context)
     {
         FURI_LOG_I(HTTP_TAG, "POST request succeeded.");
         fhttp.started_receiving_post = true;
+        furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
         return;
     }
@@ -976,6 +985,7 @@ void flipper_http_rx_callback(const char *line, void *context)
     {
         FURI_LOG_I(HTTP_TAG, "PUT request succeeded.");
         fhttp.started_receiving_put = true;
+        furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
         return;
     }
@@ -983,6 +993,7 @@ void flipper_http_rx_callback(const char *line, void *context)
     {
         FURI_LOG_I(HTTP_TAG, "DELETE request succeeded.");
         fhttp.started_receiving_delete = true;
+        furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
         return;
     }
