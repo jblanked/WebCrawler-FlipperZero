@@ -349,6 +349,13 @@ void flipper_http_deinit()
         fhttp.received_data = NULL;
     }
 
+    // Free the last response
+    if (fhttp.last_response)
+    {
+        free(fhttp.last_response);
+        fhttp.last_response = NULL;
+    }
+
     FURI_LOG_I("FlipperHTTP", "UART deinitialized successfully.");
 }
 
@@ -967,7 +974,6 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.started_receiving_get = true;
         furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
-        free(fhttp.received_data);
         fhttp.received_data = NULL;
         return;
     }
@@ -977,7 +983,6 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.started_receiving_post = true;
         furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
-        free(fhttp.received_data);
         fhttp.received_data = NULL;
         return;
     }
@@ -987,7 +992,6 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.started_receiving_put = true;
         furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
-        free(fhttp.received_data);
         fhttp.received_data = NULL;
         return;
     }
@@ -997,7 +1001,6 @@ void flipper_http_rx_callback(const char *line, void *context)
         fhttp.started_receiving_delete = true;
         furi_timer_start(fhttp.get_timeout_timer, TIMEOUT_DURATION_TICKS);
         fhttp.state = RECEIVING;
-        free(fhttp.received_data);
         fhttp.received_data = NULL;
         return;
     }
