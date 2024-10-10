@@ -12,7 +12,7 @@
 
 #define HTTP_TAG "WebCrawler"             // change this to your app name
 #define http_tag "web_crawler_app"        // change this to your app id
-#define UART_CH (FuriHalSerialIdUsart)    // UART channel (switched from FuriHalSerialIdUsart to FuriHalSerialIdLpuart)
+#define UART_CH (FuriHalSerialIdUsart)    // UART channel
 #define TIMEOUT_DURATION_TICKS (2 * 1000) // 2 seconds
 #define BAUDRATE (115200)                 // UART baudrate
 #define RX_BUF_SIZE 1024                  // UART RX buffer size
@@ -39,6 +39,7 @@ bool flipper_http_put_request_with_headers(const char *url, const char *headers,
 bool flipper_http_delete_request_with_headers(const char *url, const char *headers, const char *payload);
 //---
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[]);
+static char *trim(const char *str);
 
 // Define GPIO pins for UART
 GpioPin test_pins[2] = {
@@ -95,8 +96,7 @@ typedef struct
     bool just_started_delete;      // Indicates if DELETE data reception has just started
 } FlipperHTTP;
 
-// Declare uart as extern to prevent multiple definitions
-static FlipperHTTP fhttp;
+FlipperHTTP fhttp;
 
 // Timer callback function
 /**
@@ -680,14 +680,15 @@ void flipper_http_rx_callback(const char *line, void *context)
         return;
     }
 
-    // if line isnt empty save it
-    if (line[0] != '\0')
+    // Trim the received line to check if it's empty
+    char *trimmed_line = trim(line);
+    if (trimmed_line != NULL && trimmed_line[0] != '\0')
     {
         fhttp.last_response = (char *)line;
     }
+    free(trimmed_line); // Free the allocated memory for trimmed_line
 
-    // the only way for the state to change from INACTIVE to RECEIVING is if a PONG is received
-    if (fhttp.state != INACTIVE)
+    if (fhttp.state != INACTIVE && fhttp.state != ISSUE)
     {
         fhttp.state = RECEIVING;
     }
@@ -1090,6 +1091,42 @@ bool flipper_http_save_received_data(size_t bytes_received, const char line_buff
     }
 
     return true;
+}
+// Function to trim leading and trailing spaces and newlines from a constant string
+char *trim(const char *str)
+{
+    const char *end;
+    char *trimmed_str;
+    size_t len;
+
+    // Trim leading space
+    while (isspace((unsigned char)*str))
+        str++;
+
+    // All spaces?
+    if (*str == 0)
+        return strdup(""); // Return an empty string if all spaces
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end))
+        end--;
+
+    // Set length for the trimmed string
+    len = end - str + 1;
+
+    // Allocate space for the trimmed string and null terminator
+    trimmed_str = (char *)malloc(len + 1);
+    if (trimmed_str == NULL)
+    {
+        return NULL; // Handle memory allocation failure
+    }
+
+    // Copy the trimmed part of the string into trimmed_str
+    strncpy(trimmed_str, str, len);
+    trimmed_str[len] = '\0'; // Null terminate the string
+
+    return trimmed_str;
 }
 
 #endif // FLIPPER_HTTP_H
