@@ -15,7 +15,8 @@
 #define UART_CH (FuriHalSerialIdUsart)    // UART channel
 #define TIMEOUT_DURATION_TICKS (2 * 1000) // 2 seconds
 #define BAUDRATE (115200)                 // UART baudrate
-#define RX_BUF_SIZE 1024                  // UART RX buffer size
+#define RX_BUF_SIZE 128                   // UART RX buffer size
+#define RX_LINE_BUFFER_SIZE 2048          // UART RX line buffer size (increase for large responses)
 
 // Forward declaration for callback
 typedef void (*FlipperHTTP_Callback)(const char *line, void *context);
@@ -161,7 +162,14 @@ static int32_t flipper_http_worker(void *context)
 {
     UNUSED(context);
     size_t rx_line_pos = 0;
-    char rx_line_buffer[256]; // Buffer to collect a line
+    char *rx_line_buffer = (char *)malloc(RX_LINE_BUFFER_SIZE);
+
+    if (!rx_line_buffer)
+    {
+        // Handle malloc failure
+        FURI_LOG_E(HTTP_TAG, "Failed to allocate memory for rx_line_buffer");
+        return -1;
+    }
 
     while (1)
     {
@@ -170,11 +178,11 @@ static int32_t flipper_http_worker(void *context)
             break;
         if (events & WorkerEvtRxDone)
         {
-            size_t len = furi_stream_buffer_receive(fhttp.flipper_http_stream, fhttp.rx_buf, RX_BUF_SIZE * 10, 0);
+            size_t len = furi_stream_buffer_receive(fhttp.flipper_http_stream, fhttp.rx_buf, RX_BUF_SIZE, 0);
             for (size_t i = 0; i < len; i++)
             {
                 char c = fhttp.rx_buf[i];
-                if (c == '\n' || rx_line_pos >= sizeof(rx_line_buffer) - 1)
+                if (c == '\n' || rx_line_pos >= RX_LINE_BUFFER_SIZE - 1)
                 {
                     rx_line_buffer[rx_line_pos] = '\0';
                     // Invoke the callback with the complete line
@@ -192,6 +200,9 @@ static int32_t flipper_http_worker(void *context)
             }
         }
     }
+
+    // Free the allocated memory before exiting the thread
+    free(rx_line_buffer);
 
     return 0;
 }
