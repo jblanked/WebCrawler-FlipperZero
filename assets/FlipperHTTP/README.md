@@ -21,7 +21,7 @@ HTTP library for Flipper Zero. Compatible with Wifi Dev Board for Flipper Zero (
 15. Click on FLASH - slow. If successful, you will see three green LED blinks on the Dev board.
 16. On the Dev Board, press the RESET button once.
 
-You are all set. Here's the initial guide: https://www.youtube.com/watch?v=Y2lUVTMTABE
+You are all set. Here's the initial guide: [https://www.youtube.com/watch?v=Y2lUVTMTABE](https://www.youtube.com/watch?v=AZfbrLKJMpM)
 
 Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and follow me for updates and upcoming Flipper apps.
 
