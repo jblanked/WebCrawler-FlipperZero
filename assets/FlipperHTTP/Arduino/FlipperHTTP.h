@@ -37,6 +37,118 @@ public:
     String delete_request(String url, String payload);
     String delete_request(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize);
 
+    // stream data as bytes
+    bool get_bytes_to_file(String url, const char *headerKeys[], const char *headerValues[], int headerSize)
+    {
+        WiFiClientSecure client;
+        client.setInsecure(); // Bypass certificate
+
+        HTTPClient http;
+
+        File file = SPIFFS.open("/test.fap", FILE_WRITE);
+        if (!file)
+        {
+            Serial.println("[ERROR] Failed to open file for writing.");
+            return false;
+        }
+
+        http.collectHeaders(headerKeys, headerSize);
+
+        if (http.begin(client, url))
+        {
+
+            for (int i = 0; i < headerSize; i++)
+            {
+                http.addHeader(headerKeys[i], headerValues[i]);
+            }
+
+            int httpCode = http.GET();
+
+            if (httpCode > 0)
+            {
+              Serial.println("[GET/SUCCESS] POST request successful.");
+                http.writeToStream(&file);
+                file.close();
+                return true;
+            }
+            else
+            {
+                Serial.print("[ERROR] GET Request Failed, error: ");
+                Serial.println(http.errorToString(httpCode).c_str());
+            }
+            http.end();
+        }
+        else
+        {
+            Serial.println("[ERROR] Unable to connect to the server.");
+        }
+        return false;
+    }
+    bool post_bytes_to_file(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize)
+    {
+        WiFiClientSecure client;
+        client.setInsecure(); // Bypass certificate
+
+        HTTPClient http;
+
+        File file = SPIFFS.open("/test.txt", FILE_WRITE);
+        if (!file)
+        {
+            Serial.println("[ERROR] Failed to open file for writing.");
+            return false;
+        }
+
+        http.collectHeaders(headerKeys, headerSize);
+
+        if (http.begin(client, url))
+        {
+
+            for (int i = 0; i < headerSize; i++)
+            {
+                http.addHeader(headerKeys[i], headerValues[i]);
+            }
+
+            int httpCode = http.POST(payload);
+
+            if (httpCode > 0)
+            {
+                Serial.println("[POST/SUCCESS] POST request successful.");
+                http.writeToStream(&file);
+                file.close();
+                return true;
+            }
+            else
+            {
+                Serial.print("[ERROR] POST Request Failed, error: ");
+                Serial.println(http.errorToString(httpCode).c_str());
+            }
+            http.end();
+        }
+        else
+        {
+            Serial.println("[ERROR] Unable to connect to the server.");
+        }
+        return false;
+    }
+
+    void print_bytes_file()
+    {
+        File file = SPIFFS.open("/test.txt", FILE_READ);
+        if (!file)
+        {
+            Serial.println("[ERROR] Failed to open file for reading.");
+            return;
+        }
+
+        while (file.available())
+        {
+            Serial.write(file.read());
+        }
+        Serial.flush();
+        Serial.println();
+        file.close();
+    }
+
     // Save and Load settings to and from SPIFFS
     bool saveWifiSettings(String data);
     bool loadWifiSettings();
@@ -228,10 +340,6 @@ bool FlipperHTTP::readSerialSettings(String receivedData, bool connectAfterSave)
     if (connectAfterSave && this->connectToWifi())
     {
         Serial.println("[SUCCESS] Connected to the new Wifi network.");
-    }
-    else
-    {
-        Serial.println("[WARNING] Saved settings but failed to connect.");
     }
 
     return true;
@@ -929,6 +1037,131 @@ void FlipperHTTP::loop()
             else
             {
                 Serial.println("[ERROR] DELETE request failed or returned empty data.");
+            }
+        }
+        // Handle [GET/BYTES]
+        else if (_data.startsWith("[GET/BYTES]"))
+        {
+            if (!this->isConnectedToWifi() && !this->connectToWifi())
+            {
+                Serial.println("[ERROR] Not connected to Wifi. Failed to reconnect.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract the JSON by removing the command part
+            String jsonData = _data.substring(strlen("[GET/BYTES]"));
+            jsonData.trim();
+
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, jsonData);
+
+            if (error)
+            {
+                Serial.print("[ERROR] Failed to parse JSON.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract values from JSON
+            if (!doc.containsKey("url"))
+            {
+                Serial.println("[ERROR] JSON does not contain url.");
+                this->ledOff();
+                return;
+            }
+            String url = doc["url"];
+
+            // Extract headers if available
+            const char *headerKeys[10];
+            const char *headerValues[10];
+            int headerSize = 0;
+
+            if (doc.containsKey("headers"))
+            {
+                JsonObject headers = doc["headers"];
+                for (JsonPair header : headers)
+                {
+                    headerKeys[headerSize] = header.key().c_str();
+                    headerValues[headerSize] = header.value();
+                    headerSize++;
+                }
+            }
+
+            // GET request
+            if (this->get_bytes_to_file(url, headerKeys, headerValues, headerSize))
+            {
+                // Serial.println("[GET/SUCCESS] GET request successful.");
+                // moved this locally since we're streaming
+                this->print_bytes_file();
+                Serial.println("[GET/END]");
+            }
+            else
+            {
+                Serial.println("[ERROR] GET request failed or returned empty data.");
+            }
+        }
+        // handle [POST/BYTES]
+        else if (_data.startsWith("[POST/BYTES]"))
+        {
+            if (!this->isConnectedToWifi() && !this->connectToWifi())
+            {
+                Serial.println("[ERROR] Not connected to Wifi. Failed to reconnect.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract the JSON by removing the command part
+            String jsonData = _data.substring(strlen("[POST/BYTES]"));
+            jsonData.trim();
+
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, jsonData);
+
+            if (error)
+            {
+                Serial.print("[ERROR] Failed to parse JSON.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract values from JSON
+            if (!doc.containsKey("url") || !doc.containsKey("payload"))
+            {
+                Serial.println("[ERROR] JSON does not contain url or payload.");
+                this->ledOff();
+                return;
+            }
+            String url = doc["url"];
+            String payload = doc["payload"];
+
+            // Extract headers if available
+            const char *headerKeys[10];
+            const char *headerValues[10];
+            int headerSize = 0;
+
+            if (doc.containsKey("headers"))
+            {
+                JsonObject headers = doc["headers"];
+                for (JsonPair header : headers)
+                {
+                    headerKeys[headerSize] = header.key().c_str();
+                    headerValues[headerSize] = header.value();
+                    headerSize++;
+                }
+            }
+
+            // POST request
+            if (this->post_bytes_to_file(url, payload, headerKeys, headerValues, headerSize))
+            {
+                //Serial.println("[POST/SUCCESS] POST request successful.");
+                // moved the success message locally since it's streaming the data
+                this->print_bytes_file();
+                Serial.println("[POST/END]");
+            }
+            else
+            {
+                Serial.println("[ERROR] POST request failed or returned empty data.");
             }
         }
 
