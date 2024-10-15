@@ -8,6 +8,7 @@
 
 ## Installation
 - Download from the Official Flipper App Store: https://lab.flipper.net/apps/web_crawler
+- Video tutorial: https://www.youtube.com/watch?v=lkui2Smckq4
 
 ## Features
 - **Configurable Request**: Specify the URL of the website you want to send a HTTP request to.
