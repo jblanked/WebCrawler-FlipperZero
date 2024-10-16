@@ -45,7 +45,7 @@ Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and fol
 | `flipper_http_delete_request_with_headers`          | `bool`           | `const char *url`, `const char *headers`, `const char *payload`                                                 | Sends a DELETE request with custom headers and a payload to the specified URL.                        |
 | `flipper_http_save_received_data`                | `bool`           | `size_t bytes_received`, `const char line_buffer[]`                                                            | Saves the received data to the SD card, with the specified size and buffer.                        |
 
-`In C, fhttp.received_data holds the received data from HTTP requests. In JavaScript, the response is returned directly from the function.`
+`In C, fhttp.received_data holds the received data from HTTP requests. In JavaScript and mPython, the response is returned directly from the function.`
 
 ## Usage in `JavaScript` (flipper_http.js):
 | **Function Name**                      | **Return Value** | **Parameters**                                       | **Description**                                                                                      |
@@ -63,3 +63,18 @@ Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and fol
 | `fhttp.post_request_with_headers`      | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a POST request with headers and payload, and returns the response of the response.       |
 | `fhttp.put_request_with_headers`       | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a PUT request with headers and payload, and returns the response of the response.        |
 | `fhttp.delete_request_with_headers`       | `string`         | `url: string`, `headers: string`, `payload: string` | Sends a PUT request with headers and payload, and returns the response of the response.        |
+
+## Usage in `Python` (flipper_http.py):
+| **Function Name**                      | **Return Value** | **Parameters**                                       | **Description**                                                                                      |
+|----------------------------------------|------------------|-----------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `flipper_http_connect_wifi`                   | `bool`           | None                                                | Sends a command to connect to WiFi and returns whether the connection was successful.                 |
+| `flipper_http_disconnect_wifi`                | `bool`           | None                                                | Sends a command to disconnect from WiFi and returns whether the disconnection was successful.          |
+| `flipper_http_ping`                           | `bool`           | None                                                | Sends a ping request to test connectivity and returns whether a response was received.                |
+| `flipper_http_save_wifi`                      | `bool`           | `ssid: str`, `password: str`                  | Saves WiFi credentials and returns whether the save operation was successful.                         |
+| `flipper_http_send_data`                      | `void`           | `data: str`                                      | Sends the specified data to the serial port.                                                          |
+| `flipper_http_read_data`                      | `str`         | `sleep_ms: int`                                  | Reads data from the serial port with a specified delay and returns the response received.      |
+| `flipper_http_get_request`                    | `str`         | `url: str`                                       | Sends a GET request to the specified URL and returns the response of the response.             |
+| `flipper_http_get_request_with_headers`       | `str`         | `url: str`, `headers: str`                    | Sends a GET request with headers and returns the response of the response.                    |
+| `flipper_http_post_request_with_headers`      | `str`         | `url: str`, `headers: str`, `data: str` | Sends a POST request with headers and data, and returns the response of the response.       |
+| `flipper_http_put_request_with_headers`       | `str`         | `url: str`, `headers: str`, `data: str` | Sends a PUT request with headers and data, and returns the response of the response.        |
+| `flipper_http_delete_request_with_headers`       | `str`         | `url: str`, `headers: str`, `data: str` | Sends a PUT request with headers and data, and returns the response of the response.        |
