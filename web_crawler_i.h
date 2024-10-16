@@ -9,35 +9,9 @@ WebCrawlerApp *web_crawler_app_alloc()
 {
     // Initialize the entire structure to zero to prevent undefined behavior
     WebCrawlerApp *app = (WebCrawlerApp *)malloc(sizeof(WebCrawlerApp));
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate WebCrawlerApp");
-        return NULL;
-    }
-    memset(app, 0, sizeof(WebCrawlerApp));
 
     // Open GUI
     Gui *gui = furi_record_open(RECORD_GUI);
-    if (!gui)
-    {
-        FURI_LOG_E(TAG, "Failed to open GUI record");
-        free_resources(app);
-        return NULL;
-    }
-
-    // Allocate ViewDispatcher
-    app->view_dispatcher = view_dispatcher_alloc();
-    if (!app->view_dispatcher)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate ViewDispatcher");
-        furi_record_close(RECORD_GUI);
-        free(app);
-        return NULL;
-    }
-
-    // Attach ViewDispatcher to GUI
-    view_dispatcher_attach_to_gui(app->view_dispatcher, gui, ViewDispatcherTypeFullscreen);
-    view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
 
     // Initialize UART with the correct callback
     if (!flipper_http_init(flipper_http_rx_callback, app))
@@ -46,214 +20,131 @@ WebCrawlerApp *web_crawler_app_alloc()
         return NULL;
     }
 
+    // Allocate ViewDispatcher
+    if (!easy_flipper_set_view_dispatcher(&app->view_dispatcher, gui, app))
+    {
+        return NULL;
+    }
+
     // Allocate and initialize temp_buffer and path
     app->temp_buffer_size_path = 128;
-    app->temp_buffer_path = malloc(app->temp_buffer_size_path);
-    if (!app->temp_buffer_path)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_path");
-        free_all(app, "Failed to allocate temp_buffer_path");
-        return NULL;
-    }
-    app->temp_buffer_path[0] = '\0';
-
-    // Allocate path
-    app->path = malloc(app->temp_buffer_size_path);
-    if (!app->path)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate path");
-        free_all(app, "Failed to allocate path");
-        return NULL;
-    }
-    app->path[0] = '\0';
-
-    // Allocate and initialize temp_buffer_ssid
-    app->temp_buffer_size_ssid = 128;
-    app->temp_buffer_ssid = malloc(app->temp_buffer_size_ssid);
-    if (!app->temp_buffer_ssid)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_ssid");
-        free_all(app, "Failed to allocate temp_buffer_ssid");
-        return NULL;
-    }
-    app->temp_buffer_ssid[0] = '\0';
-
-    // Allocate ssid
-    app->ssid = malloc(app->temp_buffer_size_ssid);
-    if (!app->ssid)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate ssid");
-        free_all(app, "Failed to allocate ssid");
-        return NULL;
-    }
-    app->ssid[0] = '\0';
-
-    // Allocate and initialize temp_buffer_password
-    app->temp_buffer_size_password = 128;
-    app->temp_buffer_password = malloc(app->temp_buffer_size_password);
-    if (!app->temp_buffer_password)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_password");
-        free_all(app, "Failed to allocate temp_buffer_password");
-        return NULL;
-    }
-    app->temp_buffer_password[0] = '\0';
-
-    // Allocate password
-    app->password = malloc(app->temp_buffer_size_password);
-    if (!app->password)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate password");
-        free_all(app, "Failed to allocate password");
-        return NULL;
-    }
-    app->password[0] = '\0';
-
-    // Allocate and initialize temp_buffer_file_type
-    app->temp_buffer_size_file_type = 128;
-    app->temp_buffer_file_type = malloc(app->temp_buffer_size_file_type);
-    if (!app->temp_buffer_file_type)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_file_type");
-        free_all(app, "Failed to allocate temp_buffer_file_type");
-        return NULL;
-    }
-
-    // Allocate file_type
-    app->file_type = malloc(app->temp_buffer_size_file_type);
-    if (!app->file_type)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate file_type");
-        free_all(app, "Failed to allocate file_type");
-        return NULL;
-    }
-    app->file_type[0] = '\0';
-
-    // Allocate and intialize temp_buffer_file_rename
+    app->temp_buffer_size_ssid = 64;
+    app->temp_buffer_size_password = 64;
+    app->temp_buffer_size_file_type = 16;
     app->temp_buffer_size_file_rename = 128;
-    app->temp_buffer_file_rename = malloc(app->temp_buffer_size_file_rename);
-    if (!app->temp_buffer_file_rename)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_file_rename");
-        free_all(app, "Failed to allocate temp_buffer_file_rename");
-        return NULL;
-    }
-
-    // Allocate file_rename
-    app->file_rename = malloc(app->temp_buffer_size_file_rename);
-    if (!app->file_rename)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate file_rename");
-        free_all(app, "Failed to allocate file_rename");
-        return NULL;
-    }
-    app->file_rename[0] = '\0';
-
-    // Allocate and initialize temp_buffer_http_method
-    app->temp_buffer_size_http_method = 128;
-    app->temp_buffer_http_method = malloc(app->temp_buffer_size_http_method);
-    if (!app->temp_buffer_http_method)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_http_method");
-        free_all(app, "Failed to allocate temp_buffer_http_method");
-        return NULL;
-    }
-
-    // Allocate http_method
-    app->http_method = malloc(app->temp_buffer_size_http_method);
-    if (!app->http_method)
-    {
-        FURI_LOG_E(TAG, "Failed to allocate http_method");
-        free_all(app, "Failed to allocate http_method");
-        return NULL;
-    }
-
-    // Allocate and initialize temp_buffer_headers
+    app->temp_buffer_size_http_method = 8;
     app->temp_buffer_size_headers = 256;
-    app->temp_buffer_headers = malloc(app->temp_buffer_size_headers);
-    if (!app->temp_buffer_headers)
+    app->temp_buffer_size_payload = 256;
+    if (!easy_flipper_set_buffer(&app->temp_buffer_path, app->temp_buffer_size_path))
     {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_headers");
-        free_all(app, "Failed to allocate temp_buffer_headers");
         return NULL;
     }
-
-    // Allocate headers
-    app->headers = malloc(app->temp_buffer_size_headers);
-    if (!app->headers)
+    if (!easy_flipper_set_buffer(&app->path, app->temp_buffer_size_path))
     {
-        FURI_LOG_E(TAG, "Failed to allocate headers");
-        free_all(app, "Failed to allocate headers");
         return NULL;
     }
-
-    // Allocate and initialize temp_buffer_payload
-    app->temp_buffer_size_payload = 128;
-    app->temp_buffer_payload = malloc(app->temp_buffer_size_payload);
-    if (!app->temp_buffer_payload)
+    if (!easy_flipper_set_buffer(&app->temp_buffer_ssid, app->temp_buffer_size_ssid))
     {
-        FURI_LOG_E(TAG, "Failed to allocate temp_buffer_payload");
-        free_all(app, "Failed to allocate temp_buffer_payload");
         return NULL;
     }
-
-    // Allocate payload
-    app->payload = malloc(app->temp_buffer_size_payload);
-    if (!app->payload)
+    if (!easy_flipper_set_buffer(&app->ssid, app->temp_buffer_size_ssid))
     {
-        FURI_LOG_E(TAG, "Failed to allocate payload");
-        free_all(app, "Failed to allocate payload");
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_password, app->temp_buffer_size_password))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->password, app->temp_buffer_size_password))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_file_type, app->temp_buffer_size_file_type))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->file_type, app->temp_buffer_size_file_type))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_file_rename, app->temp_buffer_size_file_rename))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->file_rename, app->temp_buffer_size_file_rename))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_http_method, app->temp_buffer_size_http_method))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->http_method, app->temp_buffer_size_http_method))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_headers, app->temp_buffer_size_headers))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->headers, app->temp_buffer_size_headers))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->temp_buffer_payload, app->temp_buffer_size_payload))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_buffer(&app->payload, app->temp_buffer_size_payload))
+    {
         return NULL;
     }
 
     // Allocate TextInput views
-    app->text_input_path = uart_text_input_alloc();
-    app->text_input_ssid = uart_text_input_alloc();
-    app->text_input_password = uart_text_input_alloc();
-    app->text_input_file_type = uart_text_input_alloc();
-    app->text_input_file_rename = uart_text_input_alloc();
-    app->text_input_headers = uart_text_input_alloc();
-    app->text_input_payload = uart_text_input_alloc();
-    if (!app->text_input_path || !app->text_input_ssid || !app->text_input_password || !app->text_input_file_type || !app->text_input_file_rename || !app->text_input_headers || !app->text_input_payload)
+    if (!easy_flipper_set_uart_text_input(&app->text_input_path, WebCrawlerViewTextInput, "Enter URL", app->temp_buffer_path, app->temp_buffer_size_path, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
     {
-        FURI_LOG_E(TAG, "Failed to allocate TextInput");
-        free_all(app, "Failed to allocate TextInput");
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_ssid, WebCrawlerViewTextInputSSID, "Enter SSID", app->temp_buffer_ssid, app->temp_buffer_size_ssid, NULL, web_crawler_back_to_wifi_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_password, WebCrawlerViewTextInputPassword, "Enter Password", app->temp_buffer_password, app->temp_buffer_size_password, NULL, web_crawler_back_to_wifi_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_file_type, WebCrawlerViewTextInputFileType, "Enter File Type", app->temp_buffer_file_type, app->temp_buffer_size_file_type, NULL, web_crawler_back_to_file_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_file_rename, WebCrawlerViewTextInputFileRename, "Enter File Rename", app->temp_buffer_file_rename, app->temp_buffer_size_file_rename, NULL, web_crawler_back_to_file_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_headers, WebCrawlerViewTextInputHeaders, "Enter Headers", app->temp_buffer_headers, app->temp_buffer_size_headers, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_uart_text_input(&app->text_input_payload, WebCrawlerViewTextInputPayload, "Enter Payload", app->temp_buffer_payload, app->temp_buffer_size_payload, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
+    {
         return NULL;
     }
 
-    // Add TextInput views with unique view IDs
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInput, uart_text_input_get_view(app->text_input_path));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputSSID, uart_text_input_get_view(app->text_input_ssid));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPassword, uart_text_input_get_view(app->text_input_password));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileType, uart_text_input_get_view(app->text_input_file_type));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename, uart_text_input_get_view(app->text_input_file_rename));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputHeaders, uart_text_input_get_view(app->text_input_headers));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewTextInputPayload, uart_text_input_get_view(app->text_input_payload));
-
-    // Set previous callback for TextInput views to return to Configure screen
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_path), web_crawler_back_to_request_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_headers), web_crawler_back_to_request_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_payload), web_crawler_back_to_request_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_ssid), web_crawler_back_to_wifi_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_password), web_crawler_back_to_wifi_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_file_type), web_crawler_back_to_file_callback);
-    view_set_previous_callback(uart_text_input_get_view(app->text_input_file_rename), web_crawler_back_to_file_callback);
-
-    // Allocate Configuration screen
-    app->variable_item_list_wifi = variable_item_list_alloc();
-    app->variable_item_list_file = variable_item_list_alloc();
-    app->variable_item_list_request = variable_item_list_alloc();
-    if (!app->variable_item_list_wifi || !app->variable_item_list_file || !app->variable_item_list_request)
+    // Allocate VariableItemList views
+    if (!easy_flipper_set_variable_item_list(&app->variable_item_list_wifi, WebCrawlerViewVariableItemListWifi, web_crawler_wifi_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
     {
-        FURI_LOG_E(TAG, "Failed to allocate VariableItemList");
-        free_all(app, "Failed to allocate VariableItemList");
         return NULL;
     }
-    variable_item_list_reset(app->variable_item_list_wifi);
-    variable_item_list_reset(app->variable_item_list_file);
-    variable_item_list_reset(app->variable_item_list_request);
+    if (!easy_flipper_set_variable_item_list(&app->variable_item_list_file, WebCrawlerViewVariableItemListFile, web_crawler_file_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_variable_item_list(&app->variable_item_list_request, WebCrawlerViewVariableItemListRequest, web_crawler_request_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
 
-    // Add item to the configuration screen
+    // set variable items
     app->path_item = variable_item_list_add(app->variable_item_list_request, "Path", 0, NULL, NULL);
     app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 4, web_crawler_http_method_change, app);
     app->headers_item = variable_item_list_add(app->variable_item_list_request, "Headers", 0, NULL, NULL);
@@ -284,37 +175,17 @@ WebCrawlerApp *web_crawler_app_alloc()
     variable_item_set_current_value_text(app->file_read_item, "");   // Initialize
     variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
-    // Set a single callback for all items
-    variable_item_list_set_enter_callback(app->variable_item_list_wifi, web_crawler_wifi_enter_callback, app);
-    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_wifi), web_crawler_back_to_configure_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi, variable_item_list_get_view(app->variable_item_list_wifi));
-
-    variable_item_list_set_enter_callback(app->variable_item_list_file, web_crawler_file_enter_callback, app);
-    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_file), web_crawler_back_to_configure_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile, variable_item_list_get_view(app->variable_item_list_file));
-
-    variable_item_list_set_enter_callback(app->variable_item_list_request, web_crawler_request_enter_callback, app);
-    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list_request), web_crawler_back_to_configure_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest, variable_item_list_get_view(app->variable_item_list_request));
-    //------------------------------//
-    //        SUBMENU VIEW          //
-    //------------------------------//
-
-    // Allocate
-    app->submenu_main = submenu_alloc();
-    app->submenu_config = submenu_alloc();
-    if (!app->submenu_main || !app->submenu_config)
+    // Allocate Submenu views
+    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.5", web_crawler_exit_app_callback, &app->view_dispatcher))
     {
-        FURI_LOG_E(TAG, "Failed to allocate Submenu");
-        free_all(app, "Failed to allocate Submenu");
+        return NULL;
+    }
+    if (!easy_flipper_set_submenu(&app->submenu_config, WebCrawlerViewSubmenuConfig, "Settings", web_crawler_back_to_main_callback, &app->view_dispatcher))
+    {
         return NULL;
     }
 
-    // Set header
-    submenu_set_header(app->submenu_main, "Web Crawler v0.4");
-    submenu_set_header(app->submenu_config, "Settings");
-
-    // Add items
+    // Add Submenu items
     submenu_add_item(app->submenu_main, "Run", WebCrawlerSubmenuIndexRun, web_crawler_submenu_callback, app);
     submenu_add_item(app->submenu_main, "About", WebCrawlerSubmenuIndexAbout, web_crawler_submenu_callback, app);
     submenu_add_item(app->submenu_main, "Settings", WebCrawlerSubmenuIndexConfig, web_crawler_submenu_callback, app);
@@ -323,72 +194,29 @@ WebCrawlerApp *web_crawler_app_alloc()
     submenu_add_item(app->submenu_config, "File", WebCrawlerSubmenuIndexFile, web_crawler_submenu_callback, app);
     submenu_add_item(app->submenu_config, "Request", WebCrawlerSubmenuIndexRequest, web_crawler_submenu_callback, app);
 
-    // Set previous callback for Submenu
-    view_set_previous_callback(submenu_get_view(app->submenu_main), web_crawler_exit_app_callback);       // Exit App
-    view_set_previous_callback(submenu_get_view(app->submenu_config), web_crawler_back_to_main_callback); // Back to Main
-
-    // Add Submenu view to ViewDispatcher
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewSubmenuMain, submenu_get_view(app->submenu_main));
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig, submenu_get_view(app->submenu_config));
-
-    //---------------------------------------------------------->
-
-    // Allocate Main view
-    app->view_main = view_alloc();
-    app->view_run = view_alloc();
-    if (!app->view_main || !app->view_run)
+    // Allocate views
+    if (!easy_flipper_set_view(&app->view_main, WebCrawlerViewMain, NULL, NULL, web_crawler_exit_app_callback, &app->view_dispatcher, app))
     {
-        free_all(app, "Failed to allocate Views");
         return NULL;
     }
-
-    // view_set_draw_callback(app->view_main, web_crawler_view_draw_callback);
-    view_set_previous_callback(app->view_main, web_crawler_exit_app_callback);
-
-    view_set_draw_callback(app->view_run, web_crawler_view_draw_callback);
-    view_set_previous_callback(app->view_run, web_crawler_back_to_main_callback);
-
-    // Add Main view to ViewDispatcher
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewMain, app->view_main);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewRun, app->view_run);
+    if (!easy_flipper_set_view(&app->view_run, WebCrawlerViewRun, web_crawler_view_draw_callback, NULL, web_crawler_back_to_main_callback, &app->view_dispatcher, app))
+    {
+        return NULL;
+    }
 
     //-- WIDGET ABOUT VIEW --
-
-    // Allocate and add About view
-    app->widget_about = widget_alloc();
-    app->widget_file_read = widget_alloc();
-    app->widget_file_delete = widget_alloc();
-    if (!app->widget_about || !app->widget_file_read || !app->widget_file_delete)
+    if (!easy_flipper_set_widget(&app->widget_about, WebCrawlerViewAbout, "Web Crawler App\n---\nThis is a web crawler app for Flipper Zero.\n---\nVisit github.com/jblanked for more details.\n---\nPress BACK to return.", web_crawler_back_to_main_callback, &app->view_dispatcher))
     {
-        FURI_LOG_E(TAG, "Failed to allocate Widget");
-        free_all(app, "Failed to allocate Widget");
         return NULL;
     }
-
-    // Reset the widget before adding elements
-    widget_reset(app->widget_about);
-    widget_reset(app->widget_file_read);
-    widget_reset(app->widget_file_delete);
-
-    widget_add_text_scroll_element(app->widget_about, 0, 0, 128, 64, "Web Crawler App\n"
-                                                                     "---\n"
-                                                                     "This is a web crawler app for Flipper Zero.\n"
-                                                                     "---\n"
-                                                                     "Visit github.com/jblanked for more details.\n"
-                                                                     "---\n"
-                                                                     "Press BACK to return.");
-
-    widget_add_text_scroll_element(app->widget_file_read, 0, 0, 128, 64, "Data will be displayed here.");
-    widget_add_text_scroll_element(app->widget_file_delete, 0, 0, 128, 64, "File deleted.");
-
-    view_set_previous_callback(widget_get_view(app->widget_about), web_crawler_back_to_main_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewAbout, widget_get_view(app->widget_about));
-
-    view_set_previous_callback(widget_get_view(app->widget_file_read), web_crawler_back_to_file_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewFileRead, widget_get_view(app->widget_file_read));
-
-    view_set_previous_callback(widget_get_view(app->widget_file_delete), web_crawler_back_to_file_callback);
-    view_dispatcher_add_view(app->view_dispatcher, WebCrawlerViewFileDelete, widget_get_view(app->widget_file_delete));
+    if (!easy_flipper_set_widget(&app->widget_file_read, WebCrawlerViewFileRead, "Data will be displayed here.", web_crawler_back_to_file_callback, &app->view_dispatcher))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_widget(&app->widget_file_delete, WebCrawlerViewFileDelete, "File deleted.", web_crawler_back_to_file_callback, &app->view_dispatcher))
+    {
+        return NULL;
+    }
 
     // Load Settings and Update Views
     if (!load_settings(

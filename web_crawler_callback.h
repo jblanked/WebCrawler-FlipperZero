@@ -59,7 +59,7 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
     {
         canvas_draw_str(canvas, 0, 7, "Wifi Dev Board disconnected.");
         canvas_draw_str(canvas, 0, 17, "Please connect to the board.");
-        canvas_draw_str(canvas, 0, 32, "If you board is connected,");
+        canvas_draw_str(canvas, 0, 32, "If your board is connected,");
         canvas_draw_str(canvas, 0, 42, "make sure you have flashed");
         canvas_draw_str(canvas, 0, 52, "your Dev Board with the");
         canvas_draw_str(canvas, 0, 62, "FlipperHTTP firmware.");
@@ -483,8 +483,6 @@ static void web_crawler_set_ssid_updated(void *context)
             FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
-
-        FURI_LOG_D(TAG, "SSID saved: %s", app->ssid);
     }
 
     // Return to the Configure view
@@ -524,8 +522,6 @@ static void web_crawler_set_password_update(void *context)
             FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
-
-        FURI_LOG_D(TAG, "Password saved: %s", app->password);
     }
 
     // Return to the Configure view
@@ -632,8 +628,6 @@ static void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
     }
 
     UNUSED(index);
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_path, "Enter URL");
 
     // Initialize temp_buffer with existing path
     if (app->path && strlen(app->path) > 0)
@@ -695,8 +689,6 @@ static void web_crawler_setting_item_headers_clicked(void *context, uint32_t ind
         FURI_LOG_E(TAG, "Temp buffer headers is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_headers, "Enter Headers");
 
     // Initialize temp_buffer with existing headers
     if (app->headers && strlen(app->headers) > 0)
@@ -748,8 +740,6 @@ static void web_crawler_setting_item_payload_clicked(void *context, uint32_t ind
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_payload, "Enter Payload");
 
     // Initialize temp_buffer with existing payload
     if (app->payload && strlen(app->payload) > 0)
@@ -801,8 +791,6 @@ static void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_ssid, "Enter SSID");
 
     // Initialize temp_buffer with existing SSID
     if (app->ssid && strlen(app->ssid) > 0)
@@ -854,8 +842,6 @@ static void web_crawler_setting_item_password_clicked(void *context, uint32_t in
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_password, "Enter Password");
 
     // Initialize temp_buffer with existing password
     strncpy(app->temp_buffer_password, app->password, app->temp_buffer_size_password - 1);
@@ -899,8 +885,6 @@ static void web_crawler_setting_item_file_type_clicked(void *context, uint32_t i
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_file_type, "Enter File Type");
 
     // Initialize temp_buffer with existing file_type
     if (app->file_type && strlen(app->file_type) > 0)
@@ -952,8 +936,6 @@ static void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
     }
-    // Set up the text input
-    uart_text_input_set_header_text(app->text_input_file_rename, "Enter File Rename");
 
     // Initialize temp_buffer with existing file_rename
     if (app->file_rename && strlen(app->file_rename) > 0)

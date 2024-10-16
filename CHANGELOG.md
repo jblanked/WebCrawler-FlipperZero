@@ -1,3 +1,9 @@
+## 0.5 (Cleanup)
+- Refactored using the easy flipper library
+- New python library for the FlipperHTTP flash
+- Removed unnecessary GPIO initialization
+- Removed unnecessary logging
+
 ## 0.4 (New Keyboard and HTTP Methods)
 - Updated the text input to match the text input from the UART Terminal app (big thanks to xMasterx)
 - Added POST, DELETE, and PUT requests (with payloads)
@@ -5,7 +11,7 @@
 - Added more error handling
 
 ## 0.3 (New Features)
-- Updated the progress messages displayed after sending a GET request.
+- Updated the progress messages displayed after sending a HTTP request.
 - Renamed the "Config" main submenu option to "Settings."
 - Added a submenu (WiFi, File, Request) that appears when users click the "Settings" option.
 
@@ -23,7 +29,7 @@ Clicking **Request** displays a variable item list with a single text input opti
 
 ## 0.2 (Stability Patch)
 - Changed serial functions from synchronous to asynchronous.
-- Added error handling for GET requests and WiFi Dev Board connections.
+- Added error handling for HTTP requests and WiFi Dev Board connections.
 - Updated the WiFi Dev Board firmware (FlipperHTTP) to blink the green LED three times when the board is first connected, remain solid green when the board receives a serial command, and stay solid green while processing.
 - Added auto-connect and auto-disconnect for WiFi when a user enters or exits the app.
 - Added an option to view saved data.

@@ -2,17 +2,7 @@
 #ifndef WEB_CRAWLER_E
 #define WEB_CRAWLER_E
 
-#include <furi.h>
-#include <furi_hal.h>
-#include <gui/gui.h>
-#include <gui/view.h>
-#include <gui/view_dispatcher.h>
-#include <gui/modules/submenu.h>
-#include <gui/modules/widget.h>
-#include <gui/modules/text_box.h>
-#include <gui/modules/text_input.h>
-#include <gui/modules/variable_item_list.h>
-#include <dialogs/dialogs.h>
+#include <easy_flipper.h>
 #include <storage/storage.h>
 
 #define TAG "WebCrawler"
