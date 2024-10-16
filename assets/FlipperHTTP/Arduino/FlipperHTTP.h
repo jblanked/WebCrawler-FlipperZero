@@ -1,4 +1,10 @@
-// FlipperHTTP.h for flipper-http.ino
+/* FlipperHTTP.h for flipper-http.ino
+Author: JBlanked
+Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
+Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
+Created: 2024-09-30
+Updated: 2024-10-16
+*/
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -45,7 +51,7 @@ public:
 
         HTTPClient http;
 
-        File file = SPIFFS.open("/test.fap", FILE_WRITE);
+        File file = SPIFFS.open("/test.txt", FILE_WRITE);
         if (!file)
         {
             Serial.println("[ERROR] Failed to open file for writing.");
@@ -66,7 +72,7 @@ public:
 
             if (httpCode > 0)
             {
-              Serial.println("[GET/SUCCESS] POST request successful.");
+                Serial.println("[GET/SUCCESS] GET request successful.");
                 http.writeToStream(&file);
                 file.close();
                 return true;
@@ -1154,8 +1160,8 @@ void FlipperHTTP::loop()
             // POST request
             if (this->post_bytes_to_file(url, payload, headerKeys, headerValues, headerSize))
             {
-                //Serial.println("[POST/SUCCESS] POST request successful.");
-                // moved the success message locally since it's streaming the data
+                // Serial.println("[POST/SUCCESS] POST request successful.");
+                //  moved the success message locally since it's streaming the data
                 this->print_bytes_file();
                 Serial.println("[POST/END]");
             }
