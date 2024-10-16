@@ -113,6 +113,14 @@ def flipper_http_disconnect_wifi() -> bool:
     return False
 
 
+def flipper_http_scan_wifi() -> str:
+    """Scan for WiFi networks"""
+    flipper_http_send_data("[WIFI/SCAN]")
+    data = flipper_http_read_data(500)
+    clear_buffer()
+    return data
+
+
 def flipper_http_save_wifi(ssid, password) -> bool:
     """Save WiFi credentials"""
     if ssid is None or password is None:

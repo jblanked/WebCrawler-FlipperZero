@@ -30,8 +30,20 @@ public:
     }
 
     // Main methods for flipper-http.ino
-    void setup();
     void loop();
+    void setup()
+    {
+        Serial.begin(115200);
+        // Initialize SPIFFS
+        if (!SPIFFS.begin(true))
+        {
+            Serial.println("[ERROR] SPIFFS initialization failed.");
+            ESP.restart();
+        }
+
+        this->ledStart();
+        Serial.flush();
+    }
 
     // HTTP Methods
     String get(String url);
@@ -44,99 +56,10 @@ public:
     String delete_request(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize);
 
     // stream data as bytes
-    bool get_bytes_to_file(String url, const char *headerKeys[], const char *headerValues[], int headerSize)
-    {
-        WiFiClientSecure client;
-        client.setInsecure(); // Bypass certificate
+    bool get_bytes_to_file(String url, const char *headerKeys[], const char *headerValues[], int headerSize);
+    bool post_bytes_to_file(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize);
 
-        HTTPClient http;
-
-        File file = SPIFFS.open("/test.txt", FILE_WRITE);
-        if (!file)
-        {
-            Serial.println("[ERROR] Failed to open file for writing.");
-            return false;
-        }
-
-        http.collectHeaders(headerKeys, headerSize);
-
-        if (http.begin(client, url))
-        {
-
-            for (int i = 0; i < headerSize; i++)
-            {
-                http.addHeader(headerKeys[i], headerValues[i]);
-            }
-
-            int httpCode = http.GET();
-
-            if (httpCode > 0)
-            {
-                Serial.println("[GET/SUCCESS] GET request successful.");
-                http.writeToStream(&file);
-                file.close();
-                return true;
-            }
-            else
-            {
-                Serial.print("[ERROR] GET Request Failed, error: ");
-                Serial.println(http.errorToString(httpCode).c_str());
-            }
-            http.end();
-        }
-        else
-        {
-            Serial.println("[ERROR] Unable to connect to the server.");
-        }
-        return false;
-    }
-    bool post_bytes_to_file(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize)
-    {
-        WiFiClientSecure client;
-        client.setInsecure(); // Bypass certificate
-
-        HTTPClient http;
-
-        File file = SPIFFS.open("/test.txt", FILE_WRITE);
-        if (!file)
-        {
-            Serial.println("[ERROR] Failed to open file for writing.");
-            return false;
-        }
-
-        http.collectHeaders(headerKeys, headerSize);
-
-        if (http.begin(client, url))
-        {
-
-            for (int i = 0; i < headerSize; i++)
-            {
-                http.addHeader(headerKeys[i], headerValues[i]);
-            }
-
-            int httpCode = http.POST(payload);
-
-            if (httpCode > 0)
-            {
-                Serial.println("[POST/SUCCESS] POST request successful.");
-                http.writeToStream(&file);
-                file.close();
-                return true;
-            }
-            else
-            {
-                Serial.print("[ERROR] POST Request Failed, error: ");
-                Serial.println(http.errorToString(httpCode).c_str());
-            }
-            http.end();
-        }
-        else
-        {
-            Serial.println("[ERROR] Unable to connect to the server.");
-        }
-        return false;
-    }
-
+    // send bytes from file to serial
     void print_bytes_file()
     {
         File file = SPIFFS.open("/test.txt", FILE_READ);
@@ -158,6 +81,23 @@ public:
     // Save and Load settings to and from SPIFFS
     bool saveWifiSettings(String data);
     bool loadWifiSettings();
+
+    // returns a string of all wifi networks
+    String scanWifiNetworks()
+    {
+        int n = WiFi.scanNetworks();
+        String networks = "";
+        for (int i = 0; i < n; ++i)
+        {
+            networks += WiFi.SSID(i);
+
+            if (i < n - 1)
+            {
+                networks += ", ";
+            }
+        }
+        return networks;
+    }
 
     // Connect to Wifi using the loaded SSID and Password
     bool connectToWifi();
@@ -678,18 +618,98 @@ String FlipperHTTP::put(String url, String payload)
     return response;
 }
 
-void FlipperHTTP::setup()
+bool FlipperHTTP::get_bytes_to_file(String url, const char *headerKeys[], const char *headerValues[], int headerSize)
 {
-    Serial.begin(115200);
-    // Initialize SPIFFS
-    if (!SPIFFS.begin(true))
+    WiFiClientSecure client;
+    client.setInsecure(); // Bypass certificate
+
+    HTTPClient http;
+
+    File file = SPIFFS.open("/test.txt", FILE_WRITE);
+    if (!file)
     {
-        Serial.println("[ERROR] SPIFFS initialization failed.");
-        ESP.restart();
+        Serial.println("[ERROR] Failed to open file for writing.");
+        return false;
     }
 
-    this->ledStart();
-    Serial.flush();
+    http.collectHeaders(headerKeys, headerSize);
+
+    if (http.begin(client, url))
+    {
+
+        for (int i = 0; i < headerSize; i++)
+        {
+            http.addHeader(headerKeys[i], headerValues[i]);
+        }
+
+        int httpCode = http.GET();
+
+        if (httpCode > 0)
+        {
+            Serial.println("[GET/SUCCESS] GET request successful.");
+            http.writeToStream(&file);
+            file.close();
+            return true;
+        }
+        else
+        {
+            Serial.print("[ERROR] GET Request Failed, error: ");
+            Serial.println(http.errorToString(httpCode).c_str());
+        }
+        http.end();
+    }
+    else
+    {
+        Serial.println("[ERROR] Unable to connect to the server.");
+    }
+    return false;
+}
+
+bool FlipperHTTP::post_bytes_to_file(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize)
+{
+    WiFiClientSecure client;
+    client.setInsecure(); // Bypass certificate
+
+    HTTPClient http;
+
+    File file = SPIFFS.open("/test.txt", FILE_WRITE);
+    if (!file)
+    {
+        Serial.println("[ERROR] Failed to open file for writing.");
+        return false;
+    }
+
+    http.collectHeaders(headerKeys, headerSize);
+
+    if (http.begin(client, url))
+    {
+
+        for (int i = 0; i < headerSize; i++)
+        {
+            http.addHeader(headerKeys[i], headerValues[i]);
+        }
+
+        int httpCode = http.POST(payload);
+
+        if (httpCode > 0)
+        {
+            Serial.println("[POST/SUCCESS] POST request successful.");
+            http.writeToStream(&file);
+            file.close();
+            return true;
+        }
+        else
+        {
+            Serial.print("[ERROR] POST Request Failed, error: ");
+            Serial.println(http.errorToString(httpCode).c_str());
+        }
+        http.end();
+    }
+    else
+    {
+        Serial.println("[ERROR] Unable to connect to the server.");
+    }
+    return false;
 }
 
 void FlipperHTTP::loop()
@@ -712,6 +732,12 @@ void FlipperHTTP::loop()
         if (_data.startsWith("[PING]"))
         {
             Serial.println("[PONG]");
+        }
+        else if (_data.startsWith("[WIFI/SCAN]"))
+        {
+            Serial.println(this->scanWifiNetworks());
+            Serial.flush();
+            Serial.println();
         }
         // Handle [WIFI/SAVE] command
         else if (_data.startsWith("[WIFI/SAVE]"))

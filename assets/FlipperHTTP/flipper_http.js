@@ -84,6 +84,15 @@ let fhttp = {
         this.clear_buffer(true); // Clear the buffer
         return this.includes(this.to_string(response), "[PONG]");
     },
+    // Get Wifi network list
+    scan_wifi: function () {
+        serial.write("[WIFI/SCAN]");
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
     // Save wifi settings
     save_wifi: function (ssid, password) {
         if (ssid === "" || password === "") {
