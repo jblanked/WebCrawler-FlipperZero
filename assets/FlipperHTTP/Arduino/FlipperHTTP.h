@@ -11,7 +11,7 @@ Change Log:
 .
 .
 - 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
-- 2024-10-17: Added [LIST], [REBOOT], [PARSE], and [PARSE/ARRAY] commands
+- 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF] commands
 */
 
 #include <WiFi.h>
@@ -48,7 +48,7 @@ public:
             Serial.println("[ERROR] SPIFFS initialization failed.");
             ESP.restart();
         }
-
+        this->useLED = true;
         this->ledStart();
         Serial.flush();
     }
@@ -152,9 +152,12 @@ public:
     // Starting LED (Green only)
     void ledStatus()
     {
-        digitalWrite(B_PIN, OFF);
-        digitalWrite(R_PIN, OFF);
-        digitalWrite(G_PIN, ON);
+        if (this->useLED)
+        {
+            digitalWrite(B_PIN, OFF);
+            digitalWrite(R_PIN, OFF);
+            digitalWrite(G_PIN, ON);
+        }
     }
 
     // Turn off all LEDs
@@ -169,6 +172,7 @@ private:
     const char *settingsFilePath = "/flipper-http.json"; // Path to the settings file in the SPIFFS file system
     char loadedSSID[64] = {0};                           // Variable to store SSID
     char loadedPassword[64] = {0};                       // Variable to store password
+    bool useLED = true;                                  // Variable to control LED usage
 
     bool readSerialSettings(String receivedData, bool connectAfterSave);
 };
@@ -739,7 +743,17 @@ void FlipperHTTP::loop()
         // print the available commands
         if (_data.startsWith("[LIST]"))
         {
-            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY]");
+            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF]");
+        }
+        // handle [LED/ON] command
+        else if (_data.startsWith("[LED/ON]"))
+        {
+            this->useLED = true;
+        }
+        // handle [LED/OFF] command
+        else if (_data.startsWith("[LED/OFF]"))
+        {
+            this->useLED = false;
         }
         // Ping/Pong to see if board/flipper is connected
         else if (_data.startsWith("[PING]"))
@@ -749,6 +763,7 @@ void FlipperHTTP::loop()
         // Handle [REBOOT] command
         else if (_data.startsWith("[REBOOT]"))
         {
+            this->useLED = true;
             ESP.restart();
         }
         // scan for wifi networks
