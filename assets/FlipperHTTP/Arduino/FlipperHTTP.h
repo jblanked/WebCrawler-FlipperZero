@@ -11,7 +11,7 @@ Change Log:
 .
 .
 - 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
-- 2024-10-17: Added [LIST], [REBOOT], and [PARSE], and [PARSE/ARRAY] commands
+- 2024-10-17: Added [LIST], [REBOOT], [PARSE], and [PARSE/ARRAY] commands
 */
 
 #include <WiFi.h>
