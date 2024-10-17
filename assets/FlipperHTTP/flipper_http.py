@@ -113,6 +113,48 @@ def flipper_http_disconnect_wifi() -> bool:
     return False
 
 
+def flipper_http_list_commands() -> str:
+    """List all available commands"""
+    flipper_http_send_data("[LIST]")
+    data = flipper_http_read_data(500)
+    clear_buffer()
+    return data
+
+
+def flipper_http_led_on():
+    """Turn on the LED"""
+    flipper_http_send_data("[LED/ON]")
+
+
+def flipper_http_led_off():
+    """Turn off the LED"""
+    flipper_http_send_data("[LED/OFF]")
+
+
+def flipper_http_parse_json(key: str, json_data: str) -> str:
+    """Parse JSON data"""
+    flipper_http_send_data('[PARSE]{"key":"' + key + '","json":' + json_data + "}")
+    data = flipper_http_read_data(500)
+    clear_buffer()
+    return data
+
+
+def flipper_http_parse_json_array(key: str, index: int, json_data: str) -> str:
+    """Parse JSON data"""
+    flipper_http_send_data(
+        '[PARSE/ARRAY]{"key":"'
+        + key
+        + '","index":"'
+        + index
+        + '","json":'
+        + json_data
+        + "}"
+    )
+    data = flipper_http_read_data(500)
+    clear_buffer()
+    return data
+
+
 def flipper_http_scan_wifi() -> str:
     """Scan for WiFi networks"""
     flipper_http_send_data("[WIFI/SCAN]")
@@ -121,7 +163,7 @@ def flipper_http_scan_wifi() -> str:
     return data
 
 
-def flipper_http_save_wifi(ssid, password) -> bool:
+def flipper_http_save_wifi(ssid: str, password: str) -> bool:
     """Save WiFi credentials"""
     if ssid is None or password is None:
         return False
@@ -133,7 +175,7 @@ def flipper_http_save_wifi(ssid, password) -> bool:
     return "[SUCCESS]" in data
 
 
-def flipper_http_get_request(url) -> str:
+def flipper_http_get_request(url: str) -> str:
     """Send a GET request to the specified URL"""
     if url is None:
         return ""
@@ -146,7 +188,7 @@ def flipper_http_get_request(url) -> str:
     return ""
 
 
-def flipper_http_get_request_with_headers(url, headers) -> str:
+def flipper_http_get_request_with_headers(url: str, headers: str) -> str:
     """Send a GET request to the specified URL with headers"""
     if url is None:
         return ""
@@ -159,7 +201,7 @@ def flipper_http_get_request_with_headers(url, headers) -> str:
     return ""
 
 
-def flipper_http_post_request_with_headers(url, headers, data):
+def flipper_http_post_request_with_headers(url: str, headers: str, data: str):
     """Send a POST request to the specified URL with headers and data"""
     if url is None:
         return ""
@@ -180,7 +222,7 @@ def flipper_http_post_request_with_headers(url, headers, data):
     return ""
 
 
-def flipper_http_put_request_with_headers(url, headers, data):
+def flipper_http_put_request_with_headers(url: str, headers: str, data: str):
     """Send a PUT request to the specified URL with headers and data"""
     if url is None:
         return ""
@@ -201,7 +243,7 @@ def flipper_http_put_request_with_headers(url, headers, data):
     return ""
 
 
-def flipper_http_delete_request_with_headers(url, headers, data):
+def flipper_http_delete_request_with_headers(url: str, headers: str, data: str):
     """Send a DELETE request to the specified URL with headers and data"""
     if url is None:
         return ""

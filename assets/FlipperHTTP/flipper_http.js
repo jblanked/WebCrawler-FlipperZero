@@ -84,6 +84,41 @@ let fhttp = {
         this.clear_buffer(true); // Clear the buffer
         return this.includes(this.to_string(response), "[PONG]");
     },
+    // list available commands
+    list_commands: function () {
+        serial.write("[LIST]");
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
+    // turn on the LED
+    led_on: function () {
+        serial.write("[LED/ON]");
+    },
+    // turn off the LED
+    led_off: function () {
+        serial.write("[LED/OFF]");
+    },
+    // parse JSON data
+    parse_json: function (key, data) {
+        serial.write('[PARSE]{"key":"' + key + '","data":' + data + '}');
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
+    // parse JSON array
+    parse_json_array: function (key, index, data) {
+        serial.write('[PARSE/ARRAY]{"key":"' + key + '","index":' + index + ',"data":' + data + '}');
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
     // Get Wifi network list
     scan_wifi: function () {
         serial.write("[WIFI/SCAN]");
