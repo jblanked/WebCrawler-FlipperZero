@@ -3,7 +3,15 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-09-30
-Updated: 2024-10-16
+Updated: 2024-10-17
+
+Change Log:
+- 2024-09-30: Initial commit
+.
+.
+.
+- 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
+- 2024-10-17: Added [LIST], [REBOOT], and [PARSE], and [PARSE/ARRAY] commands
 */
 
 #include <WiFi.h>
@@ -728,11 +736,22 @@ void FlipperHTTP::loop()
 
         this->ledStatus();
 
+        // print the available commands
+        if (_data.startsWith("[LIST]"))
+        {
+            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY]");
+        }
         // Ping/Pong to see if board/flipper is connected
-        if (_data.startsWith("[PING]"))
+        else if (_data.startsWith("[PING]"))
         {
             Serial.println("[PONG]");
         }
+        // Handle [REBOOT] command
+        else if (_data.startsWith("[REBOOT]"))
+        {
+            ESP.restart();
+        }
+        // scan for wifi networks
         else if (_data.startsWith("[WIFI/SCAN]"))
         {
             Serial.println(this->scanWifiNetworks());
@@ -1195,6 +1214,90 @@ void FlipperHTTP::loop()
             {
                 Serial.println("[ERROR] POST request failed or returned empty data.");
             }
+        }
+        // Handle [PARSE] command
+        // the user will append the key to read from the json
+        // example: [PARSE]{"key":"name","json":{"name":"John Doe"}}
+        else if (_data.startsWith("[PARSE]"))
+        {
+            // Extract the JSON by removing the command part
+            String jsonData = _data.substring(strlen("[PARSE]"));
+            jsonData.trim();
+
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, jsonData);
+
+            if (error)
+            {
+                Serial.print("[ERROR] Failed to parse JSON.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract values from JSON
+            if (!doc.containsKey("key") || !doc.containsKey("json"))
+            {
+                Serial.println("[ERROR] JSON does not contain key or json.");
+                this->ledOff();
+                return;
+            }
+            String key = doc["key"];
+            JsonObject json = doc["json"];
+
+            if (json.containsKey(key))
+            {
+                Serial.println(json[key].as<String>());
+            }
+            else
+            {
+                Serial.println("[ERROR] Key not found in JSON.");
+            }
+        }
+        // Handle [PARSE/ARRAY] command
+        // the user will append the key to read and the index of the array to get it's key from the json
+        // example: [PARSE/ARRAY]{"key":"name","index":"1","json":{"name":["John Doe","Jane Doe"]}}
+        // this would return Jane Doe
+        // and in this example it would return {"flavor": "red"}:
+        // example: [PARSE/ARRAY]{"key":"flavor","index":"1","json":{"name":[{"flavor": "blue"},{"flavor": "red"}]}}
+        else if (_data.startsWith("[PARSE/ARRAY]"))
+        {
+            // Extract the JSON by removing the command part
+            String jsonData = _data.substring(strlen("[PARSE/ARRAY]"));
+            jsonData.trim();
+
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, jsonData);
+
+            if (error)
+            {
+                Serial.print("[ERROR] Failed to parse JSON.");
+                this->ledOff();
+                return;
+            }
+
+            // Extract values from JSON
+            if (!doc.containsKey("key") || !doc.containsKey("index") || !doc.containsKey("json"))
+            {
+                Serial.println("[ERROR] JSON does not contain key, index, or json.");
+                this->ledOff();
+                return;
+            }
+            String key = doc["key"];
+            int index = doc["index"];
+            JsonArray json = doc["json"];
+
+            if (json[index].containsKey(key))
+            {
+                Serial.println(json[index][key].as<String>());
+            }
+            else
+            {
+                Serial.println("[ERROR] Key not found in JSON.");
+            }
+        }
+        else
+        {
+            Serial.println("[ERROR] Invalid command.");
         }
 
         this->ledOff();
