@@ -34,6 +34,12 @@ bool flipper_http_ping();
 bool flipper_http_scan_wifi();
 bool flipper_http_save_wifi(const char *ssid, const char *password);
 //---
+bool flipper_http_list_commands();
+bool flipper_http_led_on();
+bool flipper_http_led_off();
+bool flipper_http_parse_json(const char *key, const char *json_data);
+bool flipper_http_parse_json_array(const char *key, int index, const char *json_data);
+//---
 bool flipper_http_get_request(const char *url);
 bool flipper_http_get_request_with_headers(const char *url, const char *headers);
 bool flipper_http_post_request_with_headers(const char *url, const char *headers, const char *payload);
@@ -424,6 +430,132 @@ bool flipper_http_ping()
     }
     // set state as INACTIVE to be made IDLE if PONG is received
     fhttp.state = INACTIVE;
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to list available commands
+/**
+ * @brief      Send a command to list available commands.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_list_commands()
+{
+    const char *command = "[LIST]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LIST command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to turn on the LED
+/**
+ * @brief      Send a command to turn on the LED.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_led_on()
+{
+    const char *command = "[LED/ON]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LED ON command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to turn off the LED
+/**
+ * @brief      Send a command to turn off the LED.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_led_off()
+{
+    const char *command = "[LED/OFF]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LED OFF command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to parse JSON data
+/**
+ * @brief      Parse JSON data.
+ * @return     true if the JSON data was parsed successfully, false otherwise.
+ * @param      key       The key to parse from the JSON data.
+ * @param      json_data The JSON data to parse.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_parse_json(const char *key, const char *json_data)
+{
+    if (!key || !json_data)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_parse_json.");
+        return false;
+    }
+
+    char buffer[256];
+    int ret = snprintf(buffer, sizeof(buffer), "[PARSE]{\"key\":\"%s\",\"json\":%s}", key, json_data);
+    if (ret < 0 || ret >= (int)sizeof(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to format JSON parse command.");
+        return false;
+    }
+
+    if (!flipper_http_send_data(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send JSON parse command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to parse JSON array data
+/**
+ * @brief      Parse JSON array data.
+ * @return     true if the JSON array data was parsed successfully, false otherwise.
+ * @param      key       The key to parse from the JSON array data.
+ * @param      index     The index to parse from the JSON array data.
+ * @param      json_data The JSON array data to parse.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_parse_json_array(const char *key, int index, const char *json_data)
+{
+    if (!key || !json_data)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_parse_json_array.");
+        return false;
+    }
+
+    char buffer[256];
+    int ret = snprintf(buffer, sizeof(buffer), "[PARSE/ARRAY]{\"key\":\"%s\",\"index\":%d,\"json\":%s}", key, index, json_data);
+    if (ret < 0 || ret >= (int)sizeof(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to format JSON parse array command.");
+        return false;
+    }
+
+    if (!flipper_http_send_data(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send JSON parse array command.");
+        return false;
+    }
+
     // The response will be handled asynchronously via the callback
     return true;
 }

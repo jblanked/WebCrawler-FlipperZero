@@ -1310,10 +1310,6 @@ void FlipperHTTP::loop()
                 Serial.println("[ERROR] Key not found in JSON.");
             }
         }
-        else
-        {
-            Serial.println("[ERROR] Invalid command.");
-        }
 
         this->ledOff();
     }

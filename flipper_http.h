@@ -34,6 +34,12 @@ bool flipper_http_ping();
 bool flipper_http_scan_wifi();
 bool flipper_http_save_wifi(const char *ssid, const char *password);
 //---
+bool flipper_http_list_commands();
+bool flipper_http_led_on();
+bool flipper_http_led_off();
+bool flipper_http_parse_json(const char *key, const char *json_data);
+bool flipper_http_parse_json_array(const char *key, int index, const char *json_data);
+//---
 bool flipper_http_get_request(const char *url);
 bool flipper_http_get_request_with_headers(const char *url, const char *headers);
 bool flipper_http_post_request_with_headers(const char *url, const char *headers, const char *payload);
@@ -248,10 +254,6 @@ bool flipper_http_init(FlipperHTTP_Callback callback, void *context)
     furi_thread_start(fhttp.rx_thread);
     fhttp.rx_thread_id = furi_thread_get_id(fhttp.rx_thread);
 
-    // Initialize GPIO pins for UART
-    // furi_hal_gpio_init_simple(&test_pins[0], GpioModeInput);
-    // furi_hal_gpio_init_simple(&test_pins[1], GpioModeOutputPushPull);
-
     // handle when the UART control is busy to avoid furi_check failed
     if (furi_hal_serial_control_is_busy(UART_CH))
     {
@@ -306,7 +308,7 @@ bool flipper_http_init(FlipperHTTP_Callback callback, void *context)
     // Set the timer thread priority if needed
     furi_timer_set_thread_priority(FuriTimerThreadPriorityElevated);
 
-    //(HTTP_TAG, "UART initialized successfully.");
+    // FURI_LOG_I(HTTP_TAG, "UART initialized successfully.");
     return true;
 }
 
@@ -428,6 +430,132 @@ bool flipper_http_ping()
     }
     // set state as INACTIVE to be made IDLE if PONG is received
     fhttp.state = INACTIVE;
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to list available commands
+/**
+ * @brief      Send a command to list available commands.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_list_commands()
+{
+    const char *command = "[LIST]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LIST command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to turn on the LED
+/**
+ * @brief      Send a command to turn on the LED.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_led_on()
+{
+    const char *command = "[LED/ON]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LED ON command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to turn off the LED
+/**
+ * @brief      Send a command to turn off the LED.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_led_off()
+{
+    const char *command = "[LED/OFF]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send LED OFF command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to parse JSON data
+/**
+ * @brief      Parse JSON data.
+ * @return     true if the JSON data was parsed successfully, false otherwise.
+ * @param      key       The key to parse from the JSON data.
+ * @param      json_data The JSON data to parse.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_parse_json(const char *key, const char *json_data)
+{
+    if (!key || !json_data)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_parse_json.");
+        return false;
+    }
+
+    char buffer[256];
+    int ret = snprintf(buffer, sizeof(buffer), "[PARSE]{\"key\":\"%s\",\"json\":%s}", key, json_data);
+    if (ret < 0 || ret >= (int)sizeof(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to format JSON parse command.");
+        return false;
+    }
+
+    if (!flipper_http_send_data(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send JSON parse command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to parse JSON array data
+/**
+ * @brief      Parse JSON array data.
+ * @return     true if the JSON array data was parsed successfully, false otherwise.
+ * @param      key       The key to parse from the JSON array data.
+ * @param      index     The index to parse from the JSON array data.
+ * @param      json_data The JSON array data to parse.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_parse_json_array(const char *key, int index, const char *json_data)
+{
+    if (!key || !json_data)
+    {
+        FURI_LOG_E("FlipperHTTP", "Invalid arguments provided to flipper_http_parse_json_array.");
+        return false;
+    }
+
+    char buffer[256];
+    int ret = snprintf(buffer, sizeof(buffer), "[PARSE/ARRAY]{\"key\":\"%s\",\"index\":%d,\"json\":%s}", key, index, json_data);
+    if (ret < 0 || ret >= (int)sizeof(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to format JSON parse array command.");
+        return false;
+    }
+
+    if (!flipper_http_send_data(buffer))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send JSON parse array command.");
+        return false;
+    }
+
     // The response will be handled asynchronously via the callback
     return true;
 }
@@ -738,14 +866,14 @@ void flipper_http_rx_callback(const char *line, void *context)
 
         if (strstr(line, "[GET/END]") != NULL)
         {
-            // FURI_LOG_I(HTTP_TAG, "GET request completed.");
-            //  Stop the timer since we've completed the GET request
+            FURI_LOG_I(HTTP_TAG, "GET request completed.");
+            // Stop the timer since we've completed the GET request
             furi_timer_stop(fhttp.get_timeout_timer);
 
             if (fhttp.received_data)
             {
                 // uncomment if you want to save the received data to the external storage
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 fhttp.started_receiving_get = false;
                 fhttp.just_started_get = false;
                 fhttp.state = IDLE;
@@ -800,14 +928,14 @@ void flipper_http_rx_callback(const char *line, void *context)
 
         if (strstr(line, "[POST/END]") != NULL)
         {
-            // FURI_LOG_I(HTTP_TAG, "POST request completed.");
-            //  Stop the timer since we've completed the POST request
+            FURI_LOG_I(HTTP_TAG, "POST request completed.");
+            // Stop the timer since we've completed the POST request
             furi_timer_stop(fhttp.get_timeout_timer);
 
             if (fhttp.received_data)
             {
                 // uncomment if you want to save the received data to the external storage
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 fhttp.started_receiving_post = false;
                 fhttp.just_started_post = false;
                 fhttp.state = IDLE;
@@ -862,14 +990,14 @@ void flipper_http_rx_callback(const char *line, void *context)
 
         if (strstr(line, "[PUT/END]") != NULL)
         {
-            // FURI_LOG_I(HTTP_TAG, "PUT request completed.");
-            //  Stop the timer since we've completed the PUT request
+            FURI_LOG_I(HTTP_TAG, "PUT request completed.");
+            // Stop the timer since we've completed the PUT request
             furi_timer_stop(fhttp.get_timeout_timer);
 
             if (fhttp.received_data)
             {
                 // uncomment if you want to save the received data to the external storage
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 fhttp.started_receiving_put = false;
                 fhttp.just_started_put = false;
                 fhttp.state = IDLE;
@@ -924,14 +1052,14 @@ void flipper_http_rx_callback(const char *line, void *context)
 
         if (strstr(line, "[DELETE/END]") != NULL)
         {
-            // FURI_LOG_I(HTTP_TAG, "DELETE request completed.");
-            //  Stop the timer since we've completed the DELETE request
+            FURI_LOG_I(HTTP_TAG, "DELETE request completed.");
+            // Stop the timer since we've completed the DELETE request
             furi_timer_stop(fhttp.get_timeout_timer);
 
             if (fhttp.received_data)
             {
                 // uncomment if you want to save the received data to the external storage
-                flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
+                // flipper_http_save_received_data(strlen(fhttp.received_data), fhttp.received_data);
                 fhttp.started_receiving_delete = false;
                 fhttp.just_started_delete = false;
                 fhttp.state = IDLE;
@@ -985,7 +1113,7 @@ void flipper_http_rx_callback(const char *line, void *context)
     }
     else if (strstr(line, "[INFO]") != NULL)
     {
-        // FURI_LOG_I(HTTP_TAG, "Received info: %s", line);
+        FURI_LOG_I(HTTP_TAG, "Received info: %s", line);
 
         if (fhttp.state == INACTIVE && strstr(line, "[INFO] Already connected to Wifi.") != NULL)
         {
@@ -1040,7 +1168,7 @@ void flipper_http_rx_callback(const char *line, void *context)
     }
     else if (strstr(line, "[PONG]") != NULL)
     {
-        // FURI_LOG_I(HTTP_TAG, "Received PONG response: Wifi Dev Board is still alive.");
+        FURI_LOG_I(HTTP_TAG, "Received PONG response: Wifi Dev Board is still alive.");
 
         // send command to connect to WiFi
         if (fhttp.state == INACTIVE)
