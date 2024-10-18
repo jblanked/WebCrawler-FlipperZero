@@ -11,7 +11,7 @@ Change Log:
 .
 .
 - 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
-- 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF] commands
+- 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF], and [IP/ADDRESS] commands
 */
 
 #include <WiFi.h>
@@ -166,6 +166,12 @@ public:
         digitalWrite(B_PIN, OFF);
         digitalWrite(G_PIN, OFF);
         digitalWrite(R_PIN, OFF);
+    }
+
+    // get IP addresss
+    String getIPAddress()
+    {
+        return WiFi.localIP().toString();
     }
 
 private:
@@ -743,7 +749,7 @@ void FlipperHTTP::loop()
         // print the available commands
         if (_data.startsWith("[LIST]"))
         {
-            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF]");
+            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
         }
         // handle [LED/ON] command
         else if (_data.startsWith("[LED/ON]"))
@@ -754,6 +760,11 @@ void FlipperHTTP::loop()
         else if (_data.startsWith("[LED/OFF]"))
         {
             this->useLED = false;
+        }
+        // handle [IP/ADDRESS] command
+        else if (_data.startsWith("[IP/ADDRESS]"))
+        {
+            Serial.println(this->getIPAddress());
         }
         // Ping/Pong to see if board/flipper is connected
         else if (_data.startsWith("[PING]"))
