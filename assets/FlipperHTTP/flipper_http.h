@@ -33,6 +33,7 @@ bool flipper_http_disconnect_wifi();
 bool flipper_http_ping();
 bool flipper_http_scan_wifi();
 bool flipper_http_save_wifi(const char *ssid, const char *password);
+bool flipper_http_ip_address();
 //---
 bool flipper_http_list_commands();
 bool flipper_http_led_on();
@@ -603,6 +604,25 @@ bool flipper_http_save_wifi(const char *ssid, const char *password)
     if (!flipper_http_send_data(buffer))
     {
         FURI_LOG_E("FlipperHTTP", "Failed to send WiFi save command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to get IP address
+/**
+ * @brief      Send a command to get the IP address.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_ip_address()
+{
+    const char *command = "[IP/ADDRESS]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send IP address command.");
         return false;
     }
 

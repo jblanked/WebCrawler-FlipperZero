@@ -134,6 +134,7 @@ def flipper_http_led_off():
 def flipper_http_parse_json(key: str, json_data: str) -> str:
     """Parse JSON data"""
     flipper_http_send_data('[PARSE]{"key":"' + key + '","json":' + json_data + "}")
+
     data = flipper_http_read_data(500)
     clear_buffer()
     return data
@@ -173,6 +174,14 @@ def flipper_http_save_wifi(ssid: str, password: str) -> bool:
     data = flipper_http_read_data()
     clear_buffer()
     return "[SUCCESS]" in data
+
+
+def flipper_http_ip_address() -> str:
+    """Get the IP address of the WiFi Devboard"""
+    flipper_http_send_data("[IP/ADDRESS]")
+    data = flipper_http_read_data()
+    clear_buffer()
+    return data
 
 
 def flipper_http_get_request(url: str) -> str:

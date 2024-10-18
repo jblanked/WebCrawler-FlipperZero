@@ -152,6 +152,15 @@ let fhttp = {
             return false;
         }
     },
+    // get IP address
+    ip_address: function () {
+        serial.write("[IP/ADDRESS]");
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
     // Send a GET request to the board
     // I reduced this to return the first line of the response that isnt undefined
     // You'll also get 'out of memory' errors if you try to read/return too much data
