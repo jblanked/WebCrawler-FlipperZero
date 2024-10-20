@@ -33,6 +33,7 @@ bool flipper_http_disconnect_wifi();
 bool flipper_http_ping();
 bool flipper_http_scan_wifi();
 bool flipper_http_save_wifi(const char *ssid, const char *password);
+bool flipper_http_ip_wifi();
 bool flipper_http_ip_address();
 //---
 bool flipper_http_list_commands();
@@ -456,7 +457,7 @@ bool flipper_http_list_commands()
 
 // Function to turn on the LED
 /**
- * @brief      Send a command to turn on the LED.
+ * @brief      Allow the LED to display while processing.
  * @return     true if the request was successful, false otherwise.
  * @note       The received data will be handled asynchronously via the callback.
  */
@@ -475,7 +476,7 @@ bool flipper_http_led_on()
 
 // Function to turn off the LED
 /**
- * @brief      Send a command to turn off the LED.
+ * @brief      Disable the LED from displaying while processing.
  * @return     true if the request was successful, false otherwise.
  * @note       The received data will be handled asynchronously via the callback.
  */
@@ -611,9 +612,9 @@ bool flipper_http_save_wifi(const char *ssid, const char *password)
     return true;
 }
 
-// Function to get IP address
+// Function to get IP address of WiFi Devboard
 /**
- * @brief      Send a command to get the IP address.
+ * @brief      Send a command to get the IP address of the WiFi Devboard
  * @return     true if the request was successful, false otherwise.
  * @note       The received data will be handled asynchronously via the callback.
  */
@@ -623,6 +624,25 @@ bool flipper_http_ip_address()
     if (!flipper_http_send_data(command))
     {
         FURI_LOG_E("FlipperHTTP", "Failed to send IP address command.");
+        return false;
+    }
+
+    // The response will be handled asynchronously via the callback
+    return true;
+}
+
+// Function to get IP address of the connected WiFi network
+/**
+ * @brief      Send a command to get the IP address of the connected WiFi network.
+ * @return     true if the request was successful, false otherwise.
+ * @note       The received data will be handled asynchronously via the callback.
+ */
+bool flipper_http_ip_wifi()
+{
+    const char *command = "[WIFI/IP]";
+    if (!flipper_http_send_data(command))
+    {
+        FURI_LOG_E("FlipperHTTP", "Failed to send WiFi IP command.");
         return false;
     }
 

@@ -122,12 +122,12 @@ def flipper_http_list_commands() -> str:
 
 
 def flipper_http_led_on():
-    """Turn on the LED"""
+    """Allow the LED to display while processing"""
     flipper_http_send_data("[LED/ON]")
 
 
 def flipper_http_led_off():
-    """Turn off the LED"""
+    """Disable the LED from displaying while processing"""
     flipper_http_send_data("[LED/OFF]")
 
 
@@ -179,6 +179,14 @@ def flipper_http_save_wifi(ssid: str, password: str) -> bool:
 def flipper_http_ip_address() -> str:
     """Get the IP address of the WiFi Devboard"""
     flipper_http_send_data("[IP/ADDRESS]")
+    data = flipper_http_read_data()
+    clear_buffer()
+    return data
+
+
+def flipper_http_ip_wifi() -> str:
+    """Get the IP address of the connected WiFi network"""
+    flipper_http_send_data("[WIFI/IP]")
     data = flipper_http_read_data()
     clear_buffer()
     return data

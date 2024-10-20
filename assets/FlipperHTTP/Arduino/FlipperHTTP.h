@@ -3,7 +3,7 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-09-30
-Updated: 2024-10-17
+Updated: 2024-10-19
 
 Change Log:
 - 2024-09-30: Initial commit
@@ -12,6 +12,7 @@ Change Log:
 .
 - 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
 - 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF], and [IP/ADDRESS] commands
+- 2024-10-19: Added [WIFI/IP] command
 */
 
 #include <WiFi.h>
@@ -730,6 +731,7 @@ bool FlipperHTTP::post_bytes_to_file(String url, String payload, const char *hea
     return false;
 }
 
+// Main loop for flipper-http.ino that handles all of the commands
 void FlipperHTTP::loop()
 {
     // Check if there's incoming serial data
@@ -749,7 +751,7 @@ void FlipperHTTP::loop()
         // print the available commands
         if (_data.startsWith("[LIST]"))
         {
-            Serial.println("[LIST],[PING], [REBOOT], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
+            Serial.println("[LIST],[PING], [REBOOT], [WIFI/IP], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
         }
         // handle [LED/ON] command
         else if (_data.startsWith("[LED/ON]"))
@@ -761,10 +763,42 @@ void FlipperHTTP::loop()
         {
             this->useLED = false;
         }
-        // handle [IP/ADDRESS] command
+        // handle [IP/ADDRESS] command (local IP)
         else if (_data.startsWith("[IP/ADDRESS]"))
         {
             Serial.println(this->getIPAddress());
+        }
+        // handle [WIFI/IP] command ip of connected wifi
+        else if (_data.startsWith("[WIFI/IP]"))
+        {
+            if (!this->isConnectedToWifi() && !this->connectToWifi())
+            {
+                Serial.println("[ERROR] Not connected to Wifi. Failed to reconnect.");
+                this->ledOff();
+                return;
+            }
+            // Get Request
+            String jsonData = this->get("https://httpbin.org/get");
+            if (jsonData == "")
+            {
+                Serial.println("[ERROR] GET request failed or returned empty data.");
+                return;
+            }
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, jsonData);
+            if (error)
+            {
+                Serial.print("[ERROR] Failed to parse JSON.");
+                this->ledOff();
+                return;
+            }
+            if (!doc.containsKey("origin"))
+            {
+                Serial.println("[ERROR] JSON does not contain origin.");
+                this->ledOff();
+                return;
+            }
+            Serial.println(doc["origin"].as<String>());
         }
         // Ping/Pong to see if board/flipper is connected
         else if (_data.startsWith("[PING]"))

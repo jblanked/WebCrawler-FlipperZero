@@ -93,11 +93,11 @@ let fhttp = {
         }
         return this.to_string(response);
     },
-    // turn on the LED
+    // Allow the LED to display while processing
     led_on: function () {
         serial.write("[LED/ON]");
     },
-    // turn off the LED
+    // Disable the LED from displaying while processing
     led_off: function () {
         serial.write("[LED/OFF]");
     },
@@ -152,9 +152,18 @@ let fhttp = {
             return false;
         }
     },
-    // get IP address
+    // Get the IP address of the WiFi Devboard
     ip_address: function () {
         serial.write("[IP/ADDRESS]");
+        let response = this.read_data(500);
+        if (response === undefined) {
+            return "";
+        }
+        return this.to_string(response);
+    },
+    // Get the IP address of the connected WiFi network
+    ip_wifi: function () {
+        serial.write("[WIFI/IP]");
         let response = this.read_data(500);
         if (response === undefined) {
             return "";
