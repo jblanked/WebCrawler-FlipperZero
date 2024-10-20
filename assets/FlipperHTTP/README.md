@@ -25,6 +25,16 @@ You are all set. Here's the initial guide: [https://www.youtube.com/watch?v=AZfb
 
 Star the repository (https://github.com/jblanked/WebCrawler-FlipperZero) and follow me for updates and upcoming Flipper apps.
 
+## Apps That Utilize FlipperHTTP
+The following apps have integrated FlipperHTTP to enhance their functionalities:
+
+- **FlipStore** - A marketplace for downloading and managing apps and software on your Flipper Zero: https://github.com/jblanked/FlipStore
+- **FlipSocial** - Social media platform for the Flipper Zero: https://github.com/jblanked/FlipSocial
+- **FlipLibrary** - A Flipper Zero app with a dictionary, random facts, and more: https://github.com/jblanked/FlipLibrary
+- **Web Crawler** - Allows your Flipper Zero to crawl and interact with websites directly: https://github.com/jblanked/WebCrawler-FlipperZero
+- **FlipWeather** - Use WiFi to get GPS and Weather information on your Flipper Zero: https://github.com/jblanked/FlipWeather
+- **FlipTrader** - Use WiFi to get the price of stocks and currency pairs on your Flipper Zero: https://github.com/jblanked/FlipTrader
+
 
 ## Usage in `C` (flipper_http.h)
 
