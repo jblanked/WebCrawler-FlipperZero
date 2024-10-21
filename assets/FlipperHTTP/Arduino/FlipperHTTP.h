@@ -13,6 +13,7 @@ Change Log:
 - 2024-10-16: Fixed typos and added [GET/BYTES], [POST/BYTES], and [WIFI/SACN] commands
 - 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF], and [IP/ADDRESS] commands
 - 2024-10-19: Added [WIFI/IP] command
+- 2024-10-21: Removed unnecessary println
 */
 
 #include <WiFi.h>
@@ -816,7 +817,6 @@ void FlipperHTTP::loop()
         {
             Serial.println(this->scanWifiNetworks());
             Serial.flush();
-            Serial.println();
         }
         // Handle [WIFI/SAVE] command
         else if (_data.startsWith("[WIFI/SAVE]"))
