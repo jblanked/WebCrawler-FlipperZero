@@ -3,7 +3,7 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-09-30
-Updated: 2024-10-19
+Updated: 2024-10-22
 
 Change Log:
 - 2024-09-30: Initial commit
@@ -14,6 +14,7 @@ Change Log:
 - 2024-10-17: Added [LIST], [REBOOT], [PARSE], [PARSE/ARRAY], [LED/ON], and [LED/OFF], and [IP/ADDRESS] commands
 - 2024-10-19: Added [WIFI/IP] command
 - 2024-10-21: Removed unnecessary println
+- 2024-10-22: Updated Post Bytes and Get Bytes methods
 */
 
 #include <WiFi.h>
@@ -22,7 +23,6 @@ Change Log:
 #include "SPIFFS.h"
 #include <ArduinoJson.h>
 #include <Arduino.h>
-#include <ArduinoHttpClient.h>
 
 #define B_PIN 4 // Blue
 #define G_PIN 5 // Green
@@ -68,25 +68,6 @@ public:
     // stream data as bytes
     bool get_bytes_to_file(String url, const char *headerKeys[], const char *headerValues[], int headerSize);
     bool post_bytes_to_file(String url, String payload, const char *headerKeys[], const char *headerValues[], int headerSize);
-
-    // send bytes from file to serial
-    void print_bytes_file()
-    {
-        File file = SPIFFS.open("/test.txt", FILE_READ);
-        if (!file)
-        {
-            Serial.println("[ERROR] Failed to open file for reading.");
-            return;
-        }
-
-        while (file.available())
-        {
-            Serial.write(file.read());
-        }
-        Serial.flush();
-        Serial.println();
-        file.close();
-    }
 
     // Save and Load settings to and from SPIFFS
     bool saveWifiSettings(String data);
@@ -645,36 +626,70 @@ bool FlipperHTTP::get_bytes_to_file(String url, const char *headerKeys[], const 
 
     HTTPClient http;
 
-    File file = SPIFFS.open("/test.txt", FILE_WRITE);
-    if (!file)
-    {
-        Serial.println("[ERROR] Failed to open file for writing.");
-        return false;
-    }
-
     http.collectHeaders(headerKeys, headerSize);
 
     if (http.begin(client, url))
     {
-
         for (int i = 0; i < headerSize; i++)
         {
             http.addHeader(headerKeys[i], headerValues[i]);
         }
 
         int httpCode = http.GET();
-
         if (httpCode > 0)
         {
-            Serial.println("[GET/SUCCESS] GET request successful.");
-            http.writeToStream(&file);
-            file.close();
+            Serial.println("[GET/SUCCESS]");
+
+            int len = http.getSize();
+            uint8_t buff[512] = {0};
+
+            WiFiClient *stream = http.getStreamPtr();
+
+            // Check available heap memory before starting
+            size_t freeHeap = ESP.getFreeHeap();
+            const size_t minHeapThreshold = 1024; // Minimum heap space to avoid overflow
+            if (freeHeap < minHeapThreshold)
+            {
+                Serial.println("[ERROR] Not enough memory to start processing the response.");
+                http.end();
+                return false;
+            }
+
+            // Stream data while connected and available
+            while (http.connected() && (len > 0 || len == -1))
+            {
+                size_t size = stream->available();
+                if (size)
+                {
+                    int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+                    Serial.write(buff, c); // Write data to serial
+                    if (len > 0)
+                    {
+                        len -= c;
+                    }
+                }
+                delay(1); // Yield control to the system
+            }
+
+            freeHeap = ESP.getFreeHeap();
+            if (freeHeap < minHeapThreshold)
+            {
+                Serial.println("[ERROR] Not enough memory to continue processing the response.");
+                http.end();
+                return false;
+            }
+
+            // Flush the serial buffer to ensure all data is sent
+            http.end();
+            Serial.flush();
+            Serial.println();
+            Serial.println("[GET/END]");
+
             return true;
         }
         else
         {
-            Serial.print("[ERROR] GET Request Failed, error: ");
-            Serial.println(http.errorToString(httpCode).c_str());
+            Serial.printf("[ERROR] GET request failed with error: %s\n", http.errorToString(httpCode).c_str());
         }
         http.end();
     }
@@ -692,36 +707,70 @@ bool FlipperHTTP::post_bytes_to_file(String url, String payload, const char *hea
 
     HTTPClient http;
 
-    File file = SPIFFS.open("/test.txt", FILE_WRITE);
-    if (!file)
-    {
-        Serial.println("[ERROR] Failed to open file for writing.");
-        return false;
-    }
-
     http.collectHeaders(headerKeys, headerSize);
 
     if (http.begin(client, url))
     {
-
         for (int i = 0; i < headerSize; i++)
         {
             http.addHeader(headerKeys[i], headerValues[i]);
         }
 
         int httpCode = http.POST(payload);
-
         if (httpCode > 0)
         {
-            Serial.println("[POST/SUCCESS] POST request successful.");
-            http.writeToStream(&file);
-            file.close();
+            Serial.println("[POST/SUCCESS]");
+
+            int len = http.getSize(); // Get the response content length
+            uint8_t buff[512] = {0};  // Buffer for reading data
+
+            WiFiClient *stream = http.getStreamPtr();
+
+            // Check available heap memory before starting
+            size_t freeHeap = ESP.getFreeHeap();
+            const size_t minHeapThreshold = 1024; // Minimum heap space to avoid overflow
+            if (freeHeap < minHeapThreshold)
+            {
+                Serial.println("[ERROR] Not enough memory to start processing the response.");
+                http.end();
+                return false;
+            }
+
+            // Stream data while connected and available
+            while (http.connected() && (len > 0 || len == -1))
+            {
+                size_t size = stream->available();
+                if (size)
+                {
+                    int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+                    Serial.write(buff, c); // Write data to serial
+                    if (len > 0)
+                    {
+                        len -= c;
+                    }
+                }
+                delay(1); // Yield control to the system
+            }
+
+            freeHeap = ESP.getFreeHeap();
+            if (freeHeap < minHeapThreshold)
+            {
+                Serial.println("[ERROR] Not enough memory to continue processing the response.");
+                http.end();
+                return false;
+            }
+
+            http.end();
+            // Flush the serial buffer to ensure all data is sent
+            Serial.flush();
+            Serial.println();
+            Serial.println("[POST/END]");
+
             return true;
         }
         else
         {
-            Serial.print("[ERROR] POST Request Failed, error: ");
-            Serial.println(http.errorToString(httpCode).c_str());
+            Serial.printf("[ERROR] POST request failed with error: %s\n", http.errorToString(httpCode).c_str());
         }
         http.end();
     }
@@ -1200,14 +1249,7 @@ void FlipperHTTP::loop()
             }
 
             // GET request
-            if (this->get_bytes_to_file(url, headerKeys, headerValues, headerSize))
-            {
-                // Serial.println("[GET/SUCCESS] GET request successful.");
-                // moved this locally since we're streaming
-                this->print_bytes_file();
-                Serial.println("[GET/END]");
-            }
-            else
+            if (!this->get_bytes_to_file(url, headerKeys, headerValues, headerSize))
             {
                 Serial.println("[ERROR] GET request failed or returned empty data.");
             }
@@ -1263,14 +1305,7 @@ void FlipperHTTP::loop()
             }
 
             // POST request
-            if (this->post_bytes_to_file(url, payload, headerKeys, headerValues, headerSize))
-            {
-                // Serial.println("[POST/SUCCESS] POST request successful.");
-                //  moved the success message locally since it's streaming the data
-                this->print_bytes_file();
-                Serial.println("[POST/END]");
-            }
-            else
+            if (!this->post_bytes_to_file(url, payload, headerKeys, headerValues, headerSize))
             {
                 Serial.println("[ERROR] POST request failed or returned empty data.");
             }
