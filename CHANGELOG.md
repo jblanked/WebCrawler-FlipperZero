@@ -1,3 +1,8 @@
+## 0.6
+- Added a DOWNLOAD method, which downloads the file at the specified path. This is best used for downloading images, binary files, and other non-text files.
+- Increased buffer size to handle larger responses.
+- Fixed the variable item lists to display as intended.
+
 ## 0.5 (Cleanup)
 - Refactored using the easy flipper library
 - New python library for the FlipperHTTP flash

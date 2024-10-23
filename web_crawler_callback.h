@@ -74,6 +74,8 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending GET request...");
 
+                fhttp.is_bytes_request = false;
+
                 // Perform GET request and handle the response
                 if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
                 {
@@ -88,6 +90,8 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending POST request...");
 
+                fhttp.is_bytes_request = false;
+
                 // Perform POST request and handle the response
                 get_success = flipper_http_post_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
             }
@@ -95,15 +99,29 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending PUT request...");
 
+                fhttp.is_bytes_request = false;
+
                 // Perform PUT request and handle the response
                 get_success = flipper_http_put_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
             }
-            else
+            else if (strstr(app_instance->http_method, "DELETE") != NULL)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending DELETE request...");
 
+                fhttp.is_bytes_request = false;
+
                 // Perform DELETE request and handle the response
                 get_success = flipper_http_delete_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+            }
+            else
+            {
+                // download file
+                canvas_draw_str(canvas, 0, 10, "Downloading file...");
+
+                fhttp.is_bytes_request = true;
+
+                // Perform GET request and handle the response
+                get_success = flipper_http_get_request_bytes(app_instance->path, app_instance->headers);
             }
 
             canvas_draw_str(canvas, 0, 20, "Sent!");
@@ -147,6 +165,12 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                     {
                         canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
                         canvas_draw_str(canvas, 0, 50, "Update your WiFi settings.");
+                        canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
+                    }
+                    else if (strstr(fhttp.last_response, "[ERROR] GET request failed with error: connection refused") != NULL)
+                    {
+                        canvas_draw_str(canvas, 0, 10, "[ERROR] Connection refused.");
+                        canvas_draw_str(canvas, 0, 50, "Choose another URL.");
                         canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
                     }
                     else
@@ -562,6 +586,16 @@ static void web_crawler_set_file_type_update(void *context)
 
     rename_received_data(app->file_rename, app->file_rename, app->file_type, old_file_type);
 
+    // set the file path for fhttp.file_path
+    if (app->file_rename && app->file_type)
+    {
+        char file_path[256];
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
+        strncpy(fhttp.file_path, file_path, sizeof(fhttp.file_path) - 1);
+        fhttp.file_path[sizeof(fhttp.file_path) - 1] = '\0'; // Null-terminate
+    }
+
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
 }
@@ -603,6 +637,16 @@ static void web_crawler_set_file_rename_update(void *context)
     }
 
     rename_received_data(old_name, app->file_rename, app->file_type, app->file_type);
+
+    // set the file path for fhttp.file_path
+    if (app->file_rename && app->file_type)
+    {
+        char file_path[256];
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
+        strncpy(fhttp.file_path, file_path, sizeof(fhttp.file_path) - 1);
+        fhttp.file_path[sizeof(fhttp.file_path) - 1] = '\0'; // Null-terminate
+    }
 
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);

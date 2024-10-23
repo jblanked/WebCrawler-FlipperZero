@@ -32,7 +32,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     app->temp_buffer_size_password = 64;
     app->temp_buffer_size_file_type = 16;
     app->temp_buffer_size_file_rename = 128;
-    app->temp_buffer_size_http_method = 8;
+    app->temp_buffer_size_http_method = 16;
     app->temp_buffer_size_headers = 256;
     app->temp_buffer_size_payload = 256;
     if (!easy_flipper_set_buffer(&app->temp_buffer_path, app->temp_buffer_size_path))
@@ -146,7 +146,7 @@ WebCrawlerApp *web_crawler_app_alloc()
 
     // set variable items
     app->path_item = variable_item_list_add(app->variable_item_list_request, "Path", 0, NULL, NULL);
-    app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 4, web_crawler_http_method_change, app);
+    app->http_method_item = variable_item_list_add(app->variable_item_list_request, "HTTP Method", 5, web_crawler_http_method_change, app);
     app->headers_item = variable_item_list_add(app->variable_item_list_request, "Headers", 0, NULL, NULL);
     app->payload_item = variable_item_list_add(app->variable_item_list_request, "Payload", 0, NULL, NULL);
     //
@@ -176,7 +176,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
     // Allocate Submenu views
-    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.5", web_crawler_exit_app_callback, &app->view_dispatcher))
+    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.6", web_crawler_exit_app_callback, &app->view_dispatcher))
     {
         return NULL;
     }
@@ -243,16 +243,16 @@ WebCrawlerApp *web_crawler_app_alloc()
     else
     {
         // Update the configuration items based on loaded settings
-        if (app->path[0] != '\0')
+        if (app->path_item)
         {
             variable_item_set_current_value_text(app->path_item, app->path);
         }
         else
         {
-            variable_item_set_current_value_text(app->path_item, ""); // Initialize
+            variable_item_set_current_value_text(app->path_item, "https://httpbin.org/get"); // Initialize
         }
 
-        if (app->ssid[0] != '\0')
+        if (app->ssid_item)
         {
             variable_item_set_current_value_text(app->ssid_item, app->ssid);
         }
@@ -261,7 +261,7 @@ WebCrawlerApp *web_crawler_app_alloc()
             variable_item_set_current_value_text(app->ssid_item, ""); // Initialize
         }
 
-        if (app->file_type[0] != '\0')
+        if (app->file_type_item)
         {
             variable_item_set_current_value_text(app->file_type_item, app->file_type);
         }
@@ -270,7 +270,7 @@ WebCrawlerApp *web_crawler_app_alloc()
             variable_item_set_current_value_text(app->file_type_item, ".txt"); // Initialize
         }
 
-        if (app->file_rename[0] != '\0')
+        if (app->file_rename_item)
         {
             variable_item_set_current_value_text(app->file_rename_item, app->file_rename);
         }
@@ -279,7 +279,7 @@ WebCrawlerApp *web_crawler_app_alloc()
             variable_item_set_current_value_text(app->file_rename_item, "received_data"); // Initialize
         }
 
-        if (app->http_method[0] != '\0')
+        if (app->http_method_item)
         {
             variable_item_set_current_value_text(app->http_method_item, app->http_method);
         }
@@ -288,7 +288,7 @@ WebCrawlerApp *web_crawler_app_alloc()
             variable_item_set_current_value_text(app->http_method_item, "GET"); // Initialize
         }
 
-        if (app->headers[0] != '\0')
+        if (app->headers_item)
         {
             variable_item_set_current_value_text(app->headers_item, app->headers);
         }
@@ -297,7 +297,7 @@ WebCrawlerApp *web_crawler_app_alloc()
             variable_item_set_current_value_text(app->headers_item, "{\n\t\"Content-Type\": \"application/json\"\n}"); // Initialize
         }
 
-        if (app->payload[0] != '\0')
+        if (app->payload_item)
         {
             variable_item_set_current_value_text(app->payload_item, app->payload);
         }
@@ -305,6 +305,27 @@ WebCrawlerApp *web_crawler_app_alloc()
         {
             variable_item_set_current_value_text(app->payload_item, "{\n\t\"key\": \"value\"\n}"); // Initialize
         }
+
+        // set the file path for fhttp.file_path
+        char file_path[128];
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s", file_path);
+
+        // update temp buffers
+        strncpy(app->temp_buffer_path, app->path, app->temp_buffer_size_path - 1);
+        app->temp_buffer_path[app->temp_buffer_size_path - 1] = '\0';
+        strncpy(app->temp_buffer_ssid, app->ssid, app->temp_buffer_size_ssid - 1);
+        app->temp_buffer_ssid[app->temp_buffer_size_ssid - 1] = '\0';
+        strncpy(app->temp_buffer_file_type, app->file_type, app->temp_buffer_size_file_type - 1);
+        app->temp_buffer_file_type[app->temp_buffer_size_file_type - 1] = '\0';
+        strncpy(app->temp_buffer_file_rename, app->file_rename, app->temp_buffer_size_file_rename - 1);
+        app->temp_buffer_file_rename[app->temp_buffer_size_file_rename - 1] = '\0';
+        strncpy(app->temp_buffer_http_method, app->http_method, app->temp_buffer_size_http_method - 1);
+        app->temp_buffer_http_method[app->temp_buffer_size_http_method - 1] = '\0';
+        strncpy(app->temp_buffer_headers, app->headers, app->temp_buffer_size_headers - 1);
+        app->temp_buffer_headers[app->temp_buffer_size_headers - 1] = '\0';
+        strncpy(app->temp_buffer_payload, app->payload, app->temp_buffer_size_payload - 1);
+        app->temp_buffer_payload[app->temp_buffer_size_payload - 1] = '\0';
 
         // Password handling can be omitted for security or handled securely
     }
