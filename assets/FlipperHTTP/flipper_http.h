@@ -13,7 +13,7 @@
 #define HTTP_TAG "FlipperHTTP"            // change this to your app name
 #define http_tag "flipper_http"           // change this to your app id
 #define UART_CH (FuriHalSerialIdUsart)    // UART channel
-#define TIMEOUT_DURATION_TICKS (2 * 1000) // 2 seconds
+#define TIMEOUT_DURATION_TICKS (5 * 1000) // 5 seconds
 #define BAUDRATE (115200)                 // UART baudrate
 #define RX_BUF_SIZE 1024                  // UART RX buffer size
 #define RX_LINE_BUFFER_SIZE 3000          // UART RX line buffer size (increase for large responses)
