@@ -3,7 +3,7 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-09-30
-Updated: 2024-10-25
+Updated: 2024-10-26
 
 Change Log:
 - 2024-09-30: Initial commit
@@ -16,6 +16,7 @@ Change Log:
 - 2024-10-21: Removed unnecessary println
 - 2024-10-22: Updated Post Bytes and Get Bytes methods
 - 2024-10-25: Updated to automatically connect to WiFi on boot if settings are saved
+- 2024-10-26: Updated the saveWifiSettings and loadWifiSettings methods to save and load a list of wifi networks, and added [WIFI/LIST] command
 */
 
 #include <WiFi.h>
@@ -201,23 +202,66 @@ bool FlipperHTTP::connectToWifi()
     }
 }
 
-// Save Wifi settings to SPIFFS
+// Save WiFi settings to SPIFFS
 bool FlipperHTTP::saveWifiSettings(String jsonData)
 {
-    File file = SPIFFS.open(settingsFilePath, FILE_WRITE);
-    if (!file)
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, jsonData);
+
+    if (error)
     {
-        Serial.println("[ERROR] Failed to open file for writing.");
+        Serial.println("[ERROR] Failed to parse JSON data.");
         return false;
     }
 
-    file.print(jsonData);
-    file.close();
-    Serial.println("[SUCCESS] Settings saved to SPIFFS.");
+    const char *newSSID = doc["ssid"];
+    const char *newPassword = doc["password"];
+
+    // Load existing settings if they exist
+    DynamicJsonDocument existingDoc(2048);
+    File file = SPIFFS.open(settingsFilePath, FILE_READ);
+    if (file)
+    {
+        deserializeJson(existingDoc, file);
+        file.close();
+    }
+
+    // Check if SSID is already saved
+    bool found = false;
+    for (JsonObject wifi : existingDoc["wifi_list"].as<JsonArray>())
+    {
+        if (wifi["ssid"] == newSSID)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    // Add new SSID and password if not found
+    if (!found)
+    {
+        JsonArray wifiList = existingDoc["wifi_list"].to<JsonArray>();
+        JsonObject newWifi = wifiList.createNestedObject();
+        newWifi["ssid"] = newSSID;
+        newWifi["password"] = newPassword;
+
+        // Save updated list to file
+        file = SPIFFS.open(settingsFilePath, FILE_WRITE);
+        if (!file)
+        {
+            Serial.println("[ERROR] Failed to open file for writing.");
+            return false;
+        }
+
+        serializeJson(existingDoc, file);
+        file.close();
+    }
+
+    Serial.print("[SUCCESS] Settings saved to SPIFFS.");
     return true;
 }
 
-// Load Wifi settings from SPIFFS
+// Load WiFi settings from SPIFFS and attempt to connect
 bool FlipperHTTP::loadWifiSettings()
 {
     File file = SPIFFS.open(settingsFilePath, FILE_READ);
@@ -230,8 +274,7 @@ bool FlipperHTTP::loadWifiSettings()
     String fileContent = file.readString();
     file.close();
 
-    // Attempt to parse the JSON data
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(2048);
     DeserializationError error = deserializeJson(doc, fileContent);
 
     if (error)
@@ -239,18 +282,31 @@ bool FlipperHTTP::loadWifiSettings()
         return false;
     }
 
-    // Extract values from JSON
-    if (doc.containsKey("ssid") && doc.containsKey("password"))
+    JsonArray wifiList = doc["wifi_list"].as<JsonArray>();
+    for (JsonObject wifi : wifiList)
     {
-        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));             // save ssid
-        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword)); // save password
-    }
-    else
-    {
-        return false;
+        const char *ssid = wifi["ssid"];
+        const char *password = wifi["password"];
+
+        strlcpy(loadedSSID, ssid, sizeof(loadedSSID));
+        strlcpy(loadedPassword, password, sizeof(loadedPassword));
+
+        WiFi.begin(ssid, password);
+
+        int attempts = 0;
+        while (!this->isConnectedToWifi() && attempts < 4) // 2 seconds total, 500ms delay each
+        {
+            delay(500);
+            attempts++;
+        }
+
+        if (this->isConnectedToWifi())
+        {
+            return true;
+        }
     }
 
-    return this->connectToWifi();
+    return false;
 }
 
 String FlipperHTTP::readSerialLine()
@@ -822,7 +878,7 @@ void FlipperHTTP::loop()
         // print the available commands
         if (_data.startsWith("[LIST]"))
         {
-            Serial.println("[LIST],[PING], [REBOOT], [WIFI/IP], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
+            Serial.println("[LIST],[PING], [REBOOT], [WIFI/IP], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [WIFI/LIST], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
         }
         // handle [LED/ON] command
         else if (_data.startsWith("[LED/ON]"))
@@ -886,6 +942,23 @@ void FlipperHTTP::loop()
         else if (_data.startsWith("[WIFI/SCAN]"))
         {
             Serial.println(this->scanWifiNetworks());
+            Serial.flush();
+        }
+        // Handle Wifi list command
+        else if (_data.startsWith("[WIFI/LIST]"))
+        {
+            File file = SPIFFS.open(settingsFilePath, FILE_READ);
+            if (!file)
+            {
+                Serial.println("[ERROR] Failed to open file for reading.");
+                return;
+            }
+
+            // Read the entire file content
+            String fileContent = file.readString();
+            file.close();
+
+            Serial.println(fileContent);
             Serial.flush();
         }
         // Handle [WIFI/SAVE] command

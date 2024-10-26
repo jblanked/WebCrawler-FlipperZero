@@ -3,12 +3,13 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-10-24
-Updated: 2024-10-25
+Updated: 2024-10-26
 
 Change Log:
 - 2024-10-24: Initial commit
 - 2024-10-25: Updated the readSerialLine method to use readStringUntil instead of reading char by char, and added Auto connect
   - Reading char by char worked on the dev board but was missing chars on the Pico
+- 2024-10-26: Updated the saveWifiSettings and loadWifiSettings methods to save and load a list of wifi networks, and added [WIFI/LIST] command
 */
 
 #include <WiFi.h>
@@ -60,9 +61,9 @@ public:
         return;
       }
     }
-    this->loadWifiSettings();
     this->useLED = true;
     this->ledStart();
+    this->loadWifiSettings();
     SerialPico.flush();
   }
 
@@ -205,20 +206,62 @@ bool FlipperHTTP::connectToWifi()
 // Save WiFi settings to LittleFS
 bool FlipperHTTP::saveWifiSettings(String jsonData)
 {
-  File file = LittleFS.open(settingsFilePath, "w");
-  if (!file)
+  DynamicJsonDocument doc(1024);
+  DeserializationError error = deserializeJson(doc, jsonData);
+
+  if (error)
   {
-    SerialPico.println("[ERROR] Failed to open file for writing.");
+    SerialPico.println("[ERROR] Failed to parse JSON data.");
     return false;
   }
 
-  file.print(jsonData);
-  file.close();
+  const char *newSSID = doc["ssid"];
+  const char *newPassword = doc["password"];
+
+  // Load existing settings if they exist
+  DynamicJsonDocument existingDoc(2048);
+  File file = LittleFS.open(settingsFilePath, "r");
+  if (file)
+  {
+    deserializeJson(existingDoc, file);
+    file.close();
+  }
+
+  // Check if SSID is already saved
+  bool found = false;
+  for (JsonObject wifi : existingDoc["wifi_list"].as<JsonArray>())
+  {
+    if (wifi["ssid"] == newSSID)
+    {
+      found = true;
+      break;
+    }
+  }
+
+  // Add new SSID and password if not found
+  if (!found)
+  {
+    JsonArray wifiList = existingDoc["wifi_list"].to<JsonArray>();
+    JsonObject newWifi = wifiList.createNestedObject();
+    newWifi["ssid"] = newSSID;
+    newWifi["password"] = newPassword;
+
+    // Save updated list to file
+    file = LittleFS.open(settingsFilePath, "w");
+    if (!file)
+    {
+      SerialPico.println("[ERROR] Failed to open file for writing.");
+      return false;
+    }
+
+    serializeJson(existingDoc, file);
+    file.close();
+  }
+
   SerialPico.println("[SUCCESS] Settings saved to LittleFS.");
   return true;
 }
 
-// Load WiFi settings from LittleFS
 bool FlipperHTTP::loadWifiSettings()
 {
   File file = LittleFS.open(settingsFilePath, "r");
@@ -227,33 +270,43 @@ bool FlipperHTTP::loadWifiSettings()
     return false;
   }
 
-  // Read the entire file content
   String fileContent = file.readString();
   file.close();
 
-  // Attempt to parse the JSON data
-    DynamicJsonDocument doc(1024);
-    DeserializationError error = deserializeJson(doc, fileContent);
+  DynamicJsonDocument doc(2048);
+  DeserializationError error = deserializeJson(doc, fileContent);
 
-    if (error)
+  if (error)
+  {
+    return false;
+  }
+
+  JsonArray wifiList = doc["wifi_list"].as<JsonArray>();
+  for (JsonObject wifi : wifiList)
+  {
+    const char *ssid = wifi["ssid"];
+    const char *password = wifi["password"];
+
+    strlcpy(loadedSSID, ssid, sizeof(loadedSSID));
+    strlcpy(loadedPassword, password, sizeof(loadedPassword));
+
+    WiFi.begin(ssid, password);
+
+    int attempts = 0;
+    while (!this->isConnectedToWifi() && attempts < 4) // 2 seconds total, 500ms delay each
     {
-        return false;
+      delay(500);
+      attempts++;
+      SerialPico.print(".");
     }
 
-    // Extract values from JSON
-    if (doc.containsKey("ssid") && doc.containsKey("password"))
+    if (this->isConnectedToWifi())
     {
-        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));             // save ssid
-        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword)); // save password
+      return true;
     }
-    else
-    {
-        return false;
-    }
-
-    return this->connectToWifi();
+  }
+  return false;
 }
-
 String FlipperHTTP::readSerialLine()
 {
   String receivedData = "";
@@ -819,7 +872,7 @@ void FlipperHTTP::loop()
     // print the available commands
     if (_data.startsWith("[LIST]"))
     {
-      SerialPico.println("[LIST],[PING], [REBOOT], [WIFI/IP], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
+      SerialPico.println("[LIST],[PING], [REBOOT], [WIFI/IP], [WIFI/SCAN], [WIFI/SAVE], [WIFI/CONNECT], [WIFI/DISCONNECT], [WIFI/LIST], [GET], [GET/HTTP], [POST/HTTP], [PUT/HTTP], [DELETE/HTTP], [GET/BYTES], [POST/BYTES], [PARSE], [PARSE/ARRAY], [LED/ON], [LED/OFF], [IP/ADDRESS]");
     }
     // handle [LED/ON] command
     else if (_data.startsWith("[LED/ON]"))
@@ -883,6 +936,22 @@ void FlipperHTTP::loop()
     else if (_data.startsWith("[WIFI/SCAN]"))
     {
       SerialPico.println(this->scanWifiNetworks());
+      SerialPico.flush();
+    }
+    // Handle Wifi list command
+    else if (_data.startsWith("[WIFI/LIST]"))
+    {
+      File file = LittleFS.open(settingsFilePath, "r");
+      if (!file)
+      {
+        SerialPico.println("[ERROR] Failed to open file for reading.");
+        return;
+      }
+
+      String fileContent = file.readString();
+      file.close();
+
+      SerialPico.println(fileContent);
       SerialPico.flush();
     }
     // Handle [WIFI/SAVE] command
