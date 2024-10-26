@@ -3,7 +3,7 @@ Author: JBlanked
 Github: https://github.com/jblanked/WebCrawler-FlipperZero/tree/main/assets/FlipperHTTP
 Info: This library is a wrapper around the HTTPClient library and is used to communicate with the FlipperZero over serial.
 Created: 2024-09-30
-Updated: 2024-10-22
+Updated: 2024-10-25
 
 Change Log:
 - 2024-09-30: Initial commit
@@ -15,6 +15,7 @@ Change Log:
 - 2024-10-19: Added [WIFI/IP] command
 - 2024-10-21: Removed unnecessary println
 - 2024-10-22: Updated Post Bytes and Get Bytes methods
+- 2024-10-25: Updated to automatically connect to WiFi on boot if settings are saved
 */
 
 #include <WiFi.h>
@@ -52,6 +53,7 @@ public:
         }
         this->useLED = true;
         this->ledStart();
+        this->loadWifiSettings();
         Serial.flush();
     }
 
@@ -221,15 +223,34 @@ bool FlipperHTTP::loadWifiSettings()
     File file = SPIFFS.open(settingsFilePath, FILE_READ);
     if (!file)
     {
-        Serial.println("[ERROR] Failed to open file for reading.");
-        return "";
+        return false;
     }
 
     // Read the entire file content
     String fileContent = file.readString();
     file.close();
 
-    return fileContent;
+    // Attempt to parse the JSON data
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, fileContent);
+
+    if (error)
+    {
+        return false;
+    }
+
+    // Extract values from JSON
+    if (doc.containsKey("ssid") && doc.containsKey("password"))
+    {
+        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));             // save ssid
+        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword)); // save password
+    }
+    else
+    {
+        return false;
+    }
+
+    return this->connectToWifi();
 }
 
 String FlipperHTTP::readSerialLine()
@@ -267,8 +288,8 @@ bool FlipperHTTP::readSerialSettings(String receivedData, bool connectAfterSave)
     // Extract values from JSON
     if (doc.containsKey("ssid") && doc.containsKey("password"))
     {
-        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));
-        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword));
+        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));             // save ssid
+        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword)); // save password
     }
     else
     {
