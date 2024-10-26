@@ -7,7 +7,7 @@ Updated: 2024-10-25
 
 Change Log:
 - 2024-10-24: Initial commit
-- 2024-10-25: Updated the readSerialLine method to use readStringUntil instead of reading char by char
+- 2024-10-25: Updated the readSerialLine method to use readStringUntil instead of reading char by char, and added Auto connect
   - Reading char by char worked on the dev board but was missing chars on the Pico
 */
 
@@ -60,7 +60,7 @@ public:
         return;
       }
     }
-
+    this->loadWifiSettings();
     this->useLED = true;
     this->ledStart();
     SerialPico.flush();
@@ -224,7 +224,6 @@ bool FlipperHTTP::loadWifiSettings()
   File file = LittleFS.open(settingsFilePath, "r");
   if (!file)
   {
-    SerialPico.println("[ERROR] Failed to open file for reading.");
     return false;
   }
 
@@ -232,8 +231,27 @@ bool FlipperHTTP::loadWifiSettings()
   String fileContent = file.readString();
   file.close();
 
-  SerialPico.println("[SUCCESS] Settings loaded from LittleFS.");
-  return true;
+  // Attempt to parse the JSON data
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, fileContent);
+
+    if (error)
+    {
+        return false;
+    }
+
+    // Extract values from JSON
+    if (doc.containsKey("ssid") && doc.containsKey("password"))
+    {
+        strlcpy(loadedSSID, doc["ssid"], sizeof(loadedSSID));             // save ssid
+        strlcpy(loadedPassword, doc["password"], sizeof(loadedPassword)); // save password
+    }
+    else
+    {
+        return false;
+    }
+
+    return this->connectToWifi();
 }
 
 String FlipperHTTP::readSerialLine()
