@@ -118,7 +118,7 @@ static void save_settings(
     furi_record_close(RECORD_STORAGE);
 }
 
-// Function to load settings: path, SSID, and password
+// Function to load settings (the variables must be opened in the order they were saved)
 static bool load_settings(
     char *path,
     size_t path_size,
@@ -154,19 +154,6 @@ static bool load_settings(
         return false; // Return false if the file does not exist
     }
 
-    // Load the path
-    size_t path_length;
-    if (storage_file_read(file, &path_length, sizeof(size_t)) != sizeof(size_t) || path_length > path_size ||
-        storage_file_read(file, path, path_length) != path_length)
-    {
-        FURI_LOG_E(TAG, "Failed to read path");
-        storage_file_close(file);
-        storage_file_free(file);
-        furi_record_close(RECORD_STORAGE);
-        return false;
-    }
-    path[path_length - 1] = '\0'; // Ensure null-termination
-
     // Load the SSID
     size_t ssid_length;
     if (storage_file_read(file, &ssid_length, sizeof(size_t)) != sizeof(size_t) || ssid_length > ssid_size ||
@@ -192,6 +179,19 @@ static bool load_settings(
         return false;
     }
     password[password_length - 1] = '\0'; // Ensure null-termination
+
+    // Load the path
+    size_t path_length;
+    if (storage_file_read(file, &path_length, sizeof(size_t)) != sizeof(size_t) || path_length > path_size ||
+        storage_file_read(file, path, path_length) != path_length)
+    {
+        FURI_LOG_E(TAG, "Failed to read path");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+    path[path_length - 1] = '\0'; // Ensure null-termination
 
     // Load the file rename
     size_t file_rename_length;
