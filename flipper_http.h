@@ -53,7 +53,7 @@ bool flipper_http_post_request_bytes(const char *url, const char *headers, const
 bool flipper_http_save_received_data(size_t bytes_received, const char line_buffer[]);
 static char *trim(const char *str);
 //
-static bool flipper_http_process_response_async(
+bool flipper_http_process_response_async(
     bool (*http_request)(void),
     bool (*parse_json)(void));
 
@@ -1508,7 +1508,7 @@ char *trim(const char *str)
  * @param parse_json The function to parse the JSON
  * @return true if successful, false otherwise
  */
-static bool flipper_http_process_response_async(
+bool flipper_http_process_response_async(
     bool (*http_request)(void),
     bool (*parse_json)(void))
 {
