@@ -50,14 +50,6 @@ static void save_settings(
         file_type = ".txt";
     }
 
-    // Save the path length and data
-    size_t path_length = strlen(path) + 1; // Include null terminator
-    if (storage_file_write(file, &path_length, sizeof(size_t)) != sizeof(size_t) ||
-        storage_file_write(file, path, path_length) != path_length)
-    {
-        FURI_LOG_E(TAG, "Failed to write path");
-    }
-
     // Save the SSID length and data
     size_t ssid_length = strlen(ssid) + 1; // Include null terminator
     if (storage_file_write(file, &ssid_length, sizeof(size_t)) != sizeof(size_t) ||
@@ -74,6 +66,13 @@ static void save_settings(
         FURI_LOG_E(TAG, "Failed to write password");
     }
 
+    // Save the path length and data
+    size_t path_length = strlen(path) + 1; // Include null terminator
+    if (storage_file_write(file, &path_length, sizeof(size_t)) != sizeof(size_t) ||
+        storage_file_write(file, path, path_length) != path_length)
+    {
+        FURI_LOG_E(TAG, "Failed to write path");
+    }
     // Save the file rename length and data
     size_t file_rename_length = strlen(file_rename) + 1; // Include null terminator
     if (storage_file_write(file, &file_rename_length, sizeof(size_t)) != sizeof(size_t) ||
