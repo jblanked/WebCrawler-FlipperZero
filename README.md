@@ -3,8 +3,9 @@
 **Web Crawler** is a custom application designed for the Flipper Zero device, allowing users to configure and manage HTTP requests directly from their Flipper Zero.
 
 ## Requirements
-- WiFi Dev Board for Flipper Zero with FlipperHTTP Flash: https://github.com/jblanked/FlipperHTTP
+- WiFi Dev Board or Raspberry Pi Pico W for Flipper Zero with FlipperHTTP Flash: https://github.com/jblanked/FlipperHTTP
 - WiFi Access Point
+
 
 ## Installation
 - Download from the Official Flipper App Store: https://lab.flipper.net/apps/web_crawler
