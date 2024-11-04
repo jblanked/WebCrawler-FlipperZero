@@ -27,13 +27,6 @@ int32_t web_crawler_app(void *p)
         return -1;
     }
 
-    // send settings and connect wifi
-    if (!flipper_http_connect_wifi())
-    {
-        FURI_LOG_E(TAG, "Failed to connect to WiFi");
-        return -1;
-    }
-
     // Run the application
     view_dispatcher_run(app->view_dispatcher);
 
