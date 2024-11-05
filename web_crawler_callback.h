@@ -70,6 +70,13 @@ static void web_crawler_view_draw_callback(Canvas *canvas, void *context)
     {
         if (!sent_http_request)
         {
+            snprintf(
+                fhttp.file_path,
+                sizeof(fhttp.file_path),
+                STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
+
+            fhttp.save_received_data = true;
+
             if (strstr(app_instance->http_method, "GET") != NULL)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending GET request...");
@@ -1050,20 +1057,43 @@ static void web_crawler_setting_item_file_read_clicked(void *context, uint32_t i
         return;
     }
     UNUSED(index);
-
-    if (!load_received_data(app))
+    widget_reset(app->widget_file_read);
+    // load the received data from the saved file
+    FuriString *received_data = flipper_http_load_from_file(fhttp.file_path);
+    if (received_data == NULL)
     {
+        FURI_LOG_E(TAG, "Failed to load received data from file.");
         if (app->widget_file_read)
         {
-            widget_reset(app->widget_file_read);
             widget_add_text_scroll_element(
                 app->widget_file_read,
                 0,
                 0,
                 128,
                 64, "File is empty.");
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
         }
+        return;
     }
+    const char *data_cstr = furi_string_get_cstr(received_data);
+    if (data_cstr == NULL)
+    {
+        FURI_LOG_E(TAG, "Failed to get C-string from FuriString.");
+        furi_string_free(received_data);
+        if (app->widget_file_read)
+        {
+            widget_add_text_scroll_element(
+                app->widget_file_read,
+                0,
+                0,
+                128,
+                64, "File is empty.");
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
+        }
+        return;
+    }
+    widget_add_text_scroll_element(app_instance->widget_file_read, 0, 0, 128, 64, data_cstr);
+    furi_string_free(received_data);
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(

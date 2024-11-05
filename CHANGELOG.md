@@ -1,3 +1,6 @@
+## 0.7
+- Improved memory allocation
+
 ## 0.6
 - Added a DOWNLOAD method, which downloads the file at the specified path. This is best used for downloading images, binary files, and other non-text files.
 - Increased buffer size to handle larger responses.

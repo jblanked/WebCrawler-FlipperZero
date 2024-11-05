@@ -176,7 +176,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
     // Allocate Submenu views
-    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.6", web_crawler_exit_app_callback, &app->view_dispatcher))
+    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.7", web_crawler_exit_app_callback, &app->view_dispatcher))
     {
         return NULL;
     }
