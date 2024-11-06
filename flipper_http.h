@@ -1235,7 +1235,7 @@ void flipper_http_rx_callback(const char *line, void *context)
             strstr(trimmed_line, "[PUT/END]") == NULL &&
             strstr(trimmed_line, "[DELETE/END]") == NULL)
         {
-            fhttp.last_response = (char *)line;
+            strncpy(fhttp.last_response, trimmed_line, RX_BUF_SIZE);
         }
     }
     free(trimmed_line); // Free the allocated memory for trimmed_line
