@@ -1,5 +1,4 @@
-#ifndef WEB_CRAWLER_I_H
-#define WEB_CRAWLER_I_H
+#include <alloc/web_crawler_alloc.h>
 
 /**
  * @brief      Function to allocate resources for the WebCrawlerApp.
@@ -330,12 +329,8 @@ WebCrawlerApp *web_crawler_app_alloc()
         // Password handling can be omitted for security or handled securely
     }
 
-    app_instance = app;
-
     // Start with the Submenu view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewSubmenuMain);
 
     return app;
 }
-
-#endif // WEB_CRAWLER_I_H

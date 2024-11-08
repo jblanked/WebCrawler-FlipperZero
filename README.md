@@ -49,7 +49,7 @@
    - Enter the complete URL of the website you intend to crawl (e.g., https://www.example.com/).
 
 2. **HTTP Method**
-   - Choose between GET, POST, DELETE, and PUT.
+   - Choose between GET, POST, DELETE, PUT, and DOWNLOAD.
 
 3. **Headers**
    - Add your required headers to be used in your HTTP requests
@@ -80,5 +80,9 @@ The Web Crawler app uses logging to help identify issues:
 - **Error Logs**: Indicate problems encountered during execution (e.g., failed to open settings file).
 
 Connect your Flipper Zero to a computer and use a serial terminal to view these logs for detailed troubleshooting.
+
+## Known Issues
+1. **Screen Delay**: Occasionally, the Run screen may get stuck on "Receiving Data".
+   - If it takes longer than 10 seconds, restart your Flipper Zero.
 
 *Happy Crawling! 🕷️* 

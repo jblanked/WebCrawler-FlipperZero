@@ -1,6 +1,6 @@
-// web_crawler_free.h
+#include <web_crawler.h>
 
-static void free_buffers(WebCrawlerApp *app)
+void free_buffers(WebCrawlerApp *app)
 {
     if (!app)
     {
@@ -104,7 +104,7 @@ static void free_buffers(WebCrawlerApp *app)
     }
 }
 
-static void free_resources(WebCrawlerApp *app)
+void free_resources(WebCrawlerApp *app)
 {
     if (!app)
     {
@@ -115,7 +115,7 @@ static void free_resources(WebCrawlerApp *app)
     free_buffers(app);
 }
 
-static void free_all(WebCrawlerApp *app, char *reason)
+void free_all(WebCrawlerApp *app, char *reason)
 {
     if (!app)
     {
@@ -169,7 +169,7 @@ static void free_all(WebCrawlerApp *app, char *reason)
  * @brief      Function to free the resources used by WebCrawlerApp.
  * @param      app  The WebCrawlerApp object to free.
  */
-static void web_crawler_app_free(WebCrawlerApp *app)
+void web_crawler_app_free(WebCrawlerApp *app)
 {
     if (!app)
     {
@@ -275,3 +275,6 @@ static void web_crawler_app_free(WebCrawlerApp *app)
         free(app);
     }
 }
+
+WebCrawlerApp *app_instance = NULL;
+char *http_method_names[] = {"GET", "POST", "PUT", "DELETE", "DOWNLOAD"};
