@@ -34,6 +34,7 @@
    - https://httpbin.org/put Returns PUT data.
    - https://httpbin.org/delete Returns DELETE data.
    - https://httpbin.org/bytes/1024 Returns BYTES data (DOWNLOAD method)
+   - https://proof.ovh.net/files/1Mb.dat Returns BYTES data (DOWNLOAD method - it can download the whole file)
 
 5. **Running the Request**: Select **Run** from the main submenu to start the HTTP request process. The app will:
    - **Send Request**: Transmit the HTTP request via serial to the WiFi Dev Board.
