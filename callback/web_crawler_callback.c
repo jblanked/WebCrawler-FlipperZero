@@ -58,17 +58,28 @@ void web_crawler_view_draw_callback(Canvas *canvas, void *context)
     {
         if (!sent_http_request)
         {
-            snprintf(
-                fhttp.file_path,
-                sizeof(fhttp.file_path),
-                STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
-
-            fhttp.save_received_data = true;
+            if (app_instance->file_type && app_instance->file_rename)
+            {
+                snprintf(
+                    fhttp.file_path,
+                    sizeof(fhttp.file_path),
+                    STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/%s%s",
+                    app_instance->file_rename,
+                    app_instance->file_type);
+            }
+            else
+            {
+                snprintf(
+                    fhttp.file_path,
+                    sizeof(fhttp.file_path),
+                    STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
+            }
 
             if (strstr(app_instance->http_method, "GET") != NULL)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending GET request...");
 
+                fhttp.save_received_data = true;
                 fhttp.is_bytes_request = false;
 
                 // Perform GET request and handle the response
@@ -85,6 +96,7 @@ void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending POST request...");
 
+                fhttp.save_received_data = true;
                 fhttp.is_bytes_request = false;
 
                 // Perform POST request and handle the response
@@ -94,6 +106,7 @@ void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending PUT request...");
 
+                fhttp.save_received_data = true;
                 fhttp.is_bytes_request = false;
 
                 // Perform PUT request and handle the response
@@ -103,6 +116,7 @@ void web_crawler_view_draw_callback(Canvas *canvas, void *context)
             {
                 canvas_draw_str(canvas, 0, 10, "Sending DELETE request...");
 
+                fhttp.save_received_data = true;
                 fhttp.is_bytes_request = false;
 
                 // Perform DELETE request and handle the response
@@ -113,6 +127,7 @@ void web_crawler_view_draw_callback(Canvas *canvas, void *context)
                 // download file
                 canvas_draw_str(canvas, 0, 10, "Downloading file...");
 
+                fhttp.save_received_data = false;
                 fhttp.is_bytes_request = true;
 
                 // Perform GET request and handle the response
@@ -1046,6 +1061,16 @@ void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
     }
     UNUSED(index);
     widget_reset(app->widget_file_read);
+
+    if (app->file_rename && app->file_type)
+    {
+        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+    }
+    else
+    {
+        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s%s%s", RECEIVED_DATA_PATH, "received_data", ".txt");
+    }
+
     // load the received data from the saved file
     FuriString *received_data = flipper_http_load_from_file(fhttp.file_path);
     if (received_data == NULL)

@@ -10,7 +10,7 @@
 
 // STORAGE_EXT_PATH_PREFIX is defined in the Furi SDK as /ext
 
-#define HTTP_TAG "WebCrawler"             // change this to your app name
+#define HTTP_TAG "Web Crawler"            // change this to your app name
 #define http_tag "web_crawler"            // change this to your app id
 #define UART_CH (FuriHalSerialIdUsart)    // UART channel
 #define TIMEOUT_DURATION_TICKS (5 * 1000) // 5 seconds

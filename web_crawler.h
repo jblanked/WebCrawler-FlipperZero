@@ -9,7 +9,7 @@
 #include "web_crawler_icons.h"
 #include <storage/storage.h>
 
-#define TAG "WebCrawler"
+#define TAG "Web Crawler"
 extern char *http_method_names[];
 
 // Define the submenu items for our WebCrawler application

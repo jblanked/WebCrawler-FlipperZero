@@ -13,7 +13,7 @@ void save_settings(
 {
     // Create the directory for saving settings
     char directory_path[256];
-    snprintf(directory_path, sizeof(directory_path), STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler_app");
+    snprintf(directory_path, sizeof(directory_path), STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler");
 
     // Create the directory
     Storage *storage = furi_record_open(RECORD_STORAGE);
