@@ -7,6 +7,8 @@ extern bool sent_http_request;
 extern bool get_success;
 extern bool already_success;
 
+void web_crawler_draw_error(Canvas *canvas);
+
 void web_crawler_http_method_change(VariableItem *item);
 
 void web_crawler_view_draw_callback(Canvas *canvas, void *context);
