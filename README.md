@@ -12,7 +12,7 @@
 - Video tutorial: https://www.youtube.com/watch?v=lkui2Smckq4
 
 ## Features
-- **Configurable Request**: Specify the URL of the website you want to send a HTTP request to or download (tested up to 100Mbs)
+- **Configurable Request**: Specify the URL of the website you want to send a HTTP request to or download (tested up to 427Mb)
 - **Wi-Fi Configuration**: Enter your Wi-Fi SSID and password to enable network communication.
 - **File Management**: Automatically saves and manages received data on the device's storage, allowing users to view, rename, and delete the received data at any time.
 
