@@ -82,6 +82,7 @@ extern FlipperHTTP fhttp;
 // Global static array for the line buffer
 extern char rx_line_buffer[RX_LINE_BUFFER_SIZE];
 extern uint8_t file_buffer[FILE_BUFFER_SIZE];
+extern size_t file_buffer_len;
 
 // fhttp.last_response holds the last received data from the UART
 
