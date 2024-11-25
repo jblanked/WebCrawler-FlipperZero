@@ -1,9 +1,20 @@
 #include <callback/web_crawler_callback.h>
+
+// Below added by Derek Jamison
+// FURI_LOG_DEV will log only during app development. Be sure that Settings/System/Log Device is "LPUART"; so we dont use serial port.
+#ifdef DEVELOPMENT
+#define FURI_LOG_DEV(tag, format, ...) furi_log_print_format(FuriLogLevelInfo, tag, format, ##__VA_ARGS__)
+#define DEV_CRASH() furi_crash()
+#else
+#define FURI_LOG_DEV(tag, format, ...)
+#define DEV_CRASH()
+#endif
+
 bool sent_http_request = false;
 bool get_success = false;
 bool already_success = false;
 
-void web_crawler_draw_error(Canvas *canvas)
+static void web_crawler_draw_error(Canvas *canvas)
 {
     if (!canvas)
     {
@@ -47,6 +58,12 @@ void web_crawler_draw_error(Canvas *canvas)
             canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
             return;
         }
+        if (strstr(fhttp.last_response, "[PONG]") != NULL)
+        {
+            canvas_clear(canvas);
+            canvas_draw_str(canvas, 0, 10, "[STATUS]Connecting to AP...");
+            return;
+        }
 
         canvas_draw_str(canvas, 0, 10, "[ERROR] Failed to sync data.");
         canvas_draw_str(canvas, 0, 30, "If this is your third attempt,");
@@ -83,147 +100,107 @@ void web_crawler_http_method_change(VariableItem *item)
     }
 }
 
-void web_crawler_view_draw_callback(Canvas *canvas, void *context)
+static bool web_crawler_fetch(DataLoaderModel *model)
 {
-    UNUSED(context);
-    if (!app_instance)
+    UNUSED(model);
+    if (app_instance->file_type && app_instance->file_rename)
     {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
-    if (!canvas)
-    {
-        FURI_LOG_E(TAG, "Canvas is NULL");
-        return;
-    }
-
-    canvas_clear(canvas);
-    canvas_set_font(canvas, FontSecondary);
-
-    if (fhttp.state == INACTIVE || fhttp.state == ISSUE)
-    {
-        web_crawler_draw_error(canvas);
-        return;
-    }
-
-    if (app_instance->path)
-    {
-        if (!sent_http_request)
-        {
-            if (app_instance->file_type && app_instance->file_rename)
-            {
-                snprintf(
-                    fhttp.file_path,
-                    sizeof(fhttp.file_path),
-                    STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/%s%s",
-                    app_instance->file_rename,
-                    app_instance->file_type);
-            }
-            else
-            {
-                snprintf(
-                    fhttp.file_path,
-                    sizeof(fhttp.file_path),
-                    STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
-            }
-
-            if (strstr(app_instance->http_method, "GET") != NULL)
-            {
-                canvas_draw_str(canvas, 0, 10, "Sending GET request...");
-
-                fhttp.save_received_data = true;
-                fhttp.is_bytes_request = false;
-
-                // Perform GET request and handle the response
-                if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
-                {
-                    get_success = flipper_http_get_request(app_instance->path);
-                }
-                else
-                {
-                    get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
-                }
-            }
-            else if (strstr(app_instance->http_method, "POST") != NULL)
-            {
-                canvas_draw_str(canvas, 0, 10, "Sending POST request...");
-
-                fhttp.save_received_data = true;
-                fhttp.is_bytes_request = false;
-
-                // Perform POST request and handle the response
-                get_success = flipper_http_post_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
-            }
-            else if (strstr(app_instance->http_method, "PUT") != NULL)
-            {
-                canvas_draw_str(canvas, 0, 10, "Sending PUT request...");
-
-                fhttp.save_received_data = true;
-                fhttp.is_bytes_request = false;
-
-                // Perform PUT request and handle the response
-                get_success = flipper_http_put_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
-            }
-            else if (strstr(app_instance->http_method, "DELETE") != NULL)
-            {
-                canvas_draw_str(canvas, 0, 10, "Sending DELETE request...");
-
-                fhttp.save_received_data = true;
-                fhttp.is_bytes_request = false;
-
-                // Perform DELETE request and handle the response
-                get_success = flipper_http_delete_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
-            }
-            else
-            {
-                // download file
-                canvas_draw_str(canvas, 0, 10, "Downloading file...");
-
-                fhttp.save_received_data = false;
-                fhttp.is_bytes_request = true;
-
-                // Perform GET request and handle the response
-                get_success = flipper_http_get_request_bytes(app_instance->path, app_instance->headers);
-            }
-
-            canvas_draw_str(canvas, 0, 20, "Sent!");
-
-            if (get_success)
-            {
-                canvas_draw_str(canvas, 0, 30, "Receiving data...");
-                fhttp.state = RECEIVING;
-            }
-            else
-            {
-                canvas_draw_str(canvas, 0, 30, "Failed.");
-                fhttp.state = ISSUE;
-            }
-
-            sent_http_request = true;
-        }
-        else
-        {
-            // print state
-            if (get_success && fhttp.state == RECEIVING)
-            {
-                canvas_draw_str(canvas, 0, 10, "Receiving and parsing data...");
-            }
-            else if (get_success && fhttp.state == IDLE)
-            {
-                canvas_draw_str(canvas, 0, 10, "Data saved to file.");
-                canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
-            }
-            else
-            {
-                web_crawler_draw_error(canvas);
-                get_success = false;
-            }
-        }
+        snprintf(
+            fhttp.file_path,
+            sizeof(fhttp.file_path),
+            STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/%s%s",
+            app_instance->file_rename,
+            app_instance->file_type);
     }
     else
     {
-        canvas_draw_str(canvas, 0, 10, "URL not set.");
+        snprintf(
+            fhttp.file_path,
+            sizeof(fhttp.file_path),
+            STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
     }
+
+    if (strstr(app_instance->http_method, "GET") != NULL)
+    {
+        fhttp.save_received_data = true;
+        fhttp.is_bytes_request = false;
+
+        // Perform GET request and handle the response
+        if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
+        {
+            get_success = flipper_http_get_request(app_instance->path);
+        }
+        else
+        {
+            get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
+        }
+    }
+    else if (strstr(app_instance->http_method, "POST") != NULL)
+    {
+        fhttp.save_received_data = true;
+        fhttp.is_bytes_request = false;
+
+        // Perform POST request and handle the response
+        get_success = flipper_http_post_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+    }
+    else if (strstr(app_instance->http_method, "PUT") != NULL)
+    {
+        fhttp.save_received_data = true;
+        fhttp.is_bytes_request = false;
+
+        // Perform PUT request and handle the response
+        get_success = flipper_http_put_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+    }
+    else if (strstr(app_instance->http_method, "DELETE") != NULL)
+    {
+        fhttp.save_received_data = true;
+        fhttp.is_bytes_request = false;
+
+        // Perform DELETE request and handle the response
+        get_success = flipper_http_delete_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+    }
+    else
+    {
+        fhttp.save_received_data = false;
+        fhttp.is_bytes_request = true;
+
+        // Perform GET request and handle the response
+        get_success = flipper_http_get_request_bytes(app_instance->path, app_instance->headers);
+    }
+    return get_success;
+}
+
+static char *web_crawler_parse(DataLoaderModel *model)
+{
+    UNUSED(model);
+    // there is no parsing since everything is saved to file
+    return "Data saved to file.\nPress BACK to return.";
+}
+
+static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
+{
+    char *title = "GET Request";
+    if (strstr(app_instance->http_method, "GET") != NULL)
+    {
+        title = "GET Request";
+    }
+    else if (strstr(app_instance->http_method, "POST") != NULL)
+    {
+        title = "POST Request";
+    }
+    else if (strstr(app_instance->http_method, "PUT") != NULL)
+    {
+        title = "PUT Request";
+    }
+    else if (strstr(app_instance->http_method, "DELETE") != NULL)
+    {
+        title = "DELETE Request";
+    }
+    else
+    {
+        title = "File Download";
+    }
+    web_crawler_generic_switch_to_view(app, title, web_crawler_fetch, web_crawler_parse, 1, web_crawler_back_to_main_callback, WebCrawlerViewLoader);
 }
 
 /**
@@ -306,7 +283,7 @@ void web_crawler_submenu_callback(void *context, uint32_t index)
         {
         case WebCrawlerSubmenuIndexRun:
             sent_http_request = false; // Reset the flag
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewRun);
+            web_crawler_data_switch_to_view(app);
             break;
         case WebCrawlerSubmenuIndexAbout:
             view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewAbout);
@@ -1134,4 +1111,463 @@ void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
 
     // Show text input dialog
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
+}
+
+static void web_crawler_widget_set_text(char *message, Widget **widget)
+{
+    if (widget == NULL)
+    {
+        FURI_LOG_E(TAG, "flip_weather_set_widget_text - widget is NULL");
+        DEV_CRASH();
+        return;
+    }
+    if (message == NULL)
+    {
+        FURI_LOG_E(TAG, "flip_weather_set_widget_text - message is NULL");
+        DEV_CRASH();
+        return;
+    }
+    widget_reset(*widget);
+
+    uint32_t message_length = strlen(message); // Length of the message
+    uint32_t i = 0;                            // Index tracker
+    uint32_t formatted_index = 0;              // Tracker for where we are in the formatted message
+    char *formatted_message;                   // Buffer to hold the final formatted message
+
+    // Allocate buffer with double the message length plus one for safety
+    if (!easy_flipper_set_buffer(&formatted_message, message_length * 2 + 1))
+    {
+        return;
+    }
+
+    while (i < message_length)
+    {
+        uint32_t max_line_length = 31;                  // Maximum characters per line
+        uint32_t remaining_length = message_length - i; // Remaining characters
+        uint32_t line_length = (remaining_length < max_line_length) ? remaining_length : max_line_length;
+
+        // Check for newline character within the current segment
+        uint32_t newline_pos = i;
+        bool found_newline = false;
+        for (; newline_pos < i + line_length && newline_pos < message_length; newline_pos++)
+        {
+            if (message[newline_pos] == '\n')
+            {
+                found_newline = true;
+                break;
+            }
+        }
+
+        if (found_newline)
+        {
+            // If newline found, set line_length up to the newline
+            line_length = newline_pos - i;
+        }
+
+        // Temporary buffer to hold the current line
+        char line[32];
+        strncpy(line, message + i, line_length);
+        line[line_length] = '\0';
+
+        // If newline was found, skip it for the next iteration
+        if (found_newline)
+        {
+            i += line_length + 1; // +1 to skip the '\n' character
+        }
+        else
+        {
+            // Check if the line ends in the middle of a word and adjust accordingly
+            if (line_length == max_line_length && message[i + line_length] != '\0' && message[i + line_length] != ' ')
+            {
+                // Find the last space within the current line to avoid breaking a word
+                char *last_space = strrchr(line, ' ');
+                if (last_space != NULL)
+                {
+                    // Adjust the line_length to avoid cutting the word
+                    line_length = last_space - line;
+                    line[line_length] = '\0'; // Null-terminate at the space
+                }
+            }
+
+            // Move the index forward by the determined line_length
+            i += line_length;
+
+            // Skip any spaces at the beginning of the next line
+            while (i < message_length && message[i] == ' ')
+            {
+                i++;
+            }
+        }
+
+        // Manually copy the fixed line into the formatted_message buffer
+        for (uint32_t j = 0; j < line_length; j++)
+        {
+            formatted_message[formatted_index++] = line[j];
+        }
+
+        // Add a newline character for line spacing
+        formatted_message[formatted_index++] = '\n';
+    }
+
+    // Null-terminate the formatted_message
+    formatted_message[formatted_index] = '\0';
+
+    // Add the formatted message to the widget
+    widget_add_text_scroll_element(*widget, 0, 0, 128, 64, formatted_message);
+}
+
+void web_crawler_loader_draw_callback(Canvas *canvas, void *model)
+{
+    if (!canvas || !model)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_draw_callback - canvas or model is NULL");
+        return;
+    }
+
+    SerialState http_state = fhttp.state;
+    DataLoaderModel *data_loader_model = (DataLoaderModel *)model;
+    DataState data_state = data_loader_model->data_state;
+    char *title = data_loader_model->title;
+
+    canvas_set_font(canvas, FontSecondary);
+
+    if (http_state == INACTIVE)
+    {
+        canvas_draw_str(canvas, 0, 7, "Wifi Dev Board disconnected.");
+        canvas_draw_str(canvas, 0, 17, "Please connect to the board.");
+        canvas_draw_str(canvas, 0, 32, "If your board is connected,");
+        canvas_draw_str(canvas, 0, 42, "make sure you have flashed");
+        canvas_draw_str(canvas, 0, 52, "your WiFi Devboard with the");
+        canvas_draw_str(canvas, 0, 62, "latest FlipperHTTP flash.");
+        return;
+    }
+
+    if (data_state == DataStateError || data_state == DataStateParseError)
+    {
+        web_crawler_draw_error(canvas);
+        return;
+    }
+
+    canvas_draw_str(canvas, 0, 7, title);
+    canvas_draw_str(canvas, 0, 17, "Loading...");
+
+    if (data_state == DataStateInitial)
+    {
+        return;
+    }
+
+    if (http_state == SENDING)
+    {
+        canvas_draw_str(canvas, 0, 27, "Sending...");
+        return;
+    }
+
+    if (http_state == RECEIVING || data_state == DataStateRequested)
+    {
+        canvas_draw_str(canvas, 0, 27, "Receiving...");
+        return;
+    }
+
+    if (http_state == IDLE && data_state == DataStateReceived)
+    {
+        canvas_draw_str(canvas, 0, 27, "Processing...");
+        return;
+    }
+
+    if (http_state == IDLE && data_state == DataStateParsed)
+    {
+        canvas_draw_str(canvas, 0, 27, "Processed...");
+        return;
+    }
+}
+
+static void web_crawler_loader_process_callback(void *context)
+{
+    if (context == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_process_callback - context is NULL");
+        DEV_CRASH();
+        return;
+    }
+
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    View *view = app->view_loader;
+
+    DataState current_data_state;
+    with_view_model(view, DataLoaderModel * model, { current_data_state = model->data_state; }, false);
+
+    if (current_data_state == DataStateInitial)
+    {
+        with_view_model(
+            view,
+            DataLoaderModel * model,
+            {
+                model->data_state = DataStateRequested;
+                DataLoaderFetch fetch = model->fetcher;
+                if (fetch == NULL)
+                {
+                    FURI_LOG_E(TAG, "Model doesn't have Fetch function assigned.");
+                    model->data_state = DataStateError;
+                    return;
+                }
+
+                // Clear any previous responses
+                strncpy(fhttp.last_response, "", 1);
+                bool request_status = fetch(model);
+                if (!request_status)
+                {
+                    model->data_state = DataStateError;
+                }
+            },
+            true);
+    }
+    else if (current_data_state == DataStateRequested || current_data_state == DataStateError)
+    {
+        if (fhttp.state == IDLE && fhttp.last_response != NULL)
+        {
+            if (strstr(fhttp.last_response, "[PONG]") != NULL)
+            {
+                FURI_LOG_DEV(TAG, "PONG received.");
+            }
+            else if (strncmp(fhttp.last_response, "[SUCCESS]", 9) == 0)
+            {
+                FURI_LOG_DEV(TAG, "SUCCESS received. %s", fhttp.last_response ? fhttp.last_response : "NULL");
+            }
+            else if (strncmp(fhttp.last_response, "[ERROR]", 9) == 0)
+            {
+                FURI_LOG_DEV(TAG, "ERROR received. %s", fhttp.last_response ? fhttp.last_response : "NULL");
+            }
+            else if (strlen(fhttp.last_response) == 0)
+            {
+                // Still waiting on response
+            }
+            else
+            {
+                with_view_model(view, DataLoaderModel * model, { model->data_state = DataStateReceived; }, true);
+            }
+        }
+        else if (fhttp.state == SENDING || fhttp.state == RECEIVING)
+        {
+            // continue waiting
+        }
+        else if (fhttp.state == INACTIVE)
+        {
+            // inactive. try again
+        }
+        else if (fhttp.state == ISSUE)
+        {
+            with_view_model(view, DataLoaderModel * model, { model->data_state = DataStateError; }, true);
+        }
+        else
+        {
+            FURI_LOG_DEV(TAG, "Unexpected state: %d lastresp: %s", fhttp.state, fhttp.last_response ? fhttp.last_response : "NULL");
+            DEV_CRASH();
+        }
+    }
+    else if (current_data_state == DataStateReceived)
+    {
+        with_view_model(
+            view,
+            DataLoaderModel * model,
+            {
+                char *data_text;
+                if (model->parser == NULL)
+                {
+                    data_text = NULL;
+                    FURI_LOG_DEV(TAG, "Parser is NULL");
+                    DEV_CRASH();
+                }
+                else
+                {
+                    data_text = model->parser(model);
+                }
+                FURI_LOG_DEV(TAG, "Parsed data: %s\r\ntext: %s", fhttp.last_response ? fhttp.last_response : "NULL", data_text ? data_text : "NULL");
+                model->data_text = data_text;
+                if (data_text == NULL)
+                {
+                    model->data_state = DataStateParseError;
+                }
+                else
+                {
+                    model->data_state = DataStateParsed;
+                }
+            },
+            true);
+    }
+    else if (current_data_state == DataStateParsed)
+    {
+        with_view_model(
+            view,
+            DataLoaderModel * model,
+            {
+                if (++model->request_index < model->request_count)
+                {
+                    model->data_state = DataStateInitial;
+                }
+                else
+                {
+                    web_crawler_widget_set_text(model->data_text != NULL ? model->data_text : "Empty result", &app_instance->widget_result);
+                    if (model->data_text != NULL)
+                    {
+                        free(model->data_text);
+                        model->data_text = NULL;
+                    }
+                    view_set_previous_callback(widget_get_view(app_instance->widget_result), model->back_callback);
+                    view_dispatcher_switch_to_view(app_instance->view_dispatcher, WebCrawlerViewWidgetResult);
+                }
+            },
+            true);
+    }
+}
+
+static void web_crawler_loader_timer_callback(void *context)
+{
+    if (context == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_timer_callback - context is NULL");
+        DEV_CRASH();
+        return;
+    }
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    view_dispatcher_send_custom_event(app->view_dispatcher, WebCrawlerCustomEventProcess);
+}
+
+static void web_crawler_loader_on_enter(void *context)
+{
+    if (context == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_on_enter - context is NULL");
+        DEV_CRASH();
+        return;
+    }
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    View *view = app->view_loader;
+    with_view_model(
+        view,
+        DataLoaderModel * model,
+        {
+            view_set_previous_callback(view, model->back_callback);
+            if (model->timer == NULL)
+            {
+                model->timer = furi_timer_alloc(web_crawler_loader_timer_callback, FuriTimerTypePeriodic, app);
+            }
+            furi_timer_start(model->timer, 250);
+        },
+        true);
+}
+
+static void web_crawler_loader_on_exit(void *context)
+{
+    if (context == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_on_exit - context is NULL");
+        DEV_CRASH();
+        return;
+    }
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    View *view = app->view_loader;
+    with_view_model(
+        view,
+        DataLoaderModel * model,
+        {
+            if (model->timer)
+            {
+                furi_timer_stop(model->timer);
+            }
+        },
+        false);
+}
+
+void web_crawler_loader_init(View *view)
+{
+    if (view == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_init - view is NULL");
+        DEV_CRASH();
+        return;
+    }
+    view_allocate_model(view, ViewModelTypeLocking, sizeof(DataLoaderModel));
+    view_set_enter_callback(view, web_crawler_loader_on_enter);
+    view_set_exit_callback(view, web_crawler_loader_on_exit);
+}
+
+void web_crawler_loader_free_model(View *view)
+{
+    if (view == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_loader_free_model - view is NULL");
+        DEV_CRASH();
+        return;
+    }
+    with_view_model(
+        view,
+        DataLoaderModel * model,
+        {
+            if (model->timer)
+            {
+                furi_timer_free(model->timer);
+                model->timer = NULL;
+            }
+            if (model->parser_context)
+            {
+                free(model->parser_context);
+                model->parser_context = NULL;
+            }
+        },
+        false);
+}
+
+bool web_crawler_custom_event_callback(void *context, uint32_t index)
+{
+    if (context == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_custom_event_callback - context is NULL");
+        DEV_CRASH();
+        return false;
+    }
+
+    switch (index)
+    {
+    case WebCrawlerCustomEventProcess:
+        web_crawler_loader_process_callback(context);
+        return true;
+    default:
+        FURI_LOG_DEV(TAG, "web_crawler_custom_event_callback. Unknown index: %ld", index);
+        return false;
+    }
+}
+
+void web_crawler_generic_switch_to_view(WebCrawlerApp *app, char *title, DataLoaderFetch fetcher, DataLoaderParser parser, size_t request_count, ViewNavigationCallback back, uint32_t view_id)
+{
+    if (app == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_generic_switch_to_view - app is NULL");
+        DEV_CRASH();
+        return;
+    }
+
+    View *view = app->view_loader;
+    if (view == NULL)
+    {
+        FURI_LOG_E(TAG, "web_crawler_generic_switch_to_view - view is NULL");
+        DEV_CRASH();
+        return;
+    }
+
+    with_view_model(
+        view,
+        DataLoaderModel * model,
+        {
+            model->title = title;
+            model->fetcher = fetcher;
+            model->parser = parser;
+            model->request_index = 0;
+            model->request_count = request_count;
+            model->back_callback = back;
+            model->data_state = DataStateInitial;
+            model->data_text = NULL;
+        },
+        true);
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, view_id);
 }

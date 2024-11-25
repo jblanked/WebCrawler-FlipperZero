@@ -24,6 +24,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     {
         return NULL;
     }
+    view_dispatcher_set_custom_event_callback(app->view_dispatcher, web_crawler_custom_event_callback);
 
     // Allocate and initialize temp_buffer and path
     app->temp_buffer_size_path = 128;
@@ -175,7 +176,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
     // Allocate Submenu views
-    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.7", web_crawler_exit_app_callback, &app->view_dispatcher))
+    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.8", web_crawler_exit_app_callback, &app->view_dispatcher))
     {
         return NULL;
     }
@@ -193,15 +194,12 @@ WebCrawlerApp *web_crawler_app_alloc()
     submenu_add_item(app->submenu_config, "File", WebCrawlerSubmenuIndexFile, web_crawler_submenu_callback, app);
     submenu_add_item(app->submenu_config, "Request", WebCrawlerSubmenuIndexRequest, web_crawler_submenu_callback, app);
 
-    // Allocate views
-    if (!easy_flipper_set_view(&app->view_main, WebCrawlerViewMain, NULL, NULL, web_crawler_exit_app_callback, &app->view_dispatcher, app))
+    // Main view
+    if (!easy_flipper_set_view(&app->view_loader, WebCrawlerViewLoader, web_crawler_loader_draw_callback, NULL, web_crawler_back_to_main_callback, &app->view_dispatcher, app))
     {
         return NULL;
     }
-    if (!easy_flipper_set_view(&app->view_run, WebCrawlerViewRun, web_crawler_view_draw_callback, NULL, web_crawler_back_to_main_callback, &app->view_dispatcher, app))
-    {
-        return NULL;
-    }
+    web_crawler_loader_init(app->view_loader);
 
     //-- WIDGET ABOUT VIEW --
     if (!easy_flipper_set_widget(&app->widget_about, WebCrawlerViewAbout, "Web Crawler App\n---\nThis is a web crawler app for Flipper Zero.\n---\nVisit github.com/jblanked for more details.\n---\nPress BACK to return.", web_crawler_back_to_main_callback, &app->view_dispatcher))
@@ -213,6 +211,10 @@ WebCrawlerApp *web_crawler_app_alloc()
         return NULL;
     }
     if (!easy_flipper_set_widget(&app->widget_file_delete, WebCrawlerViewFileDelete, "File deleted.", web_crawler_back_to_file_callback, &app->view_dispatcher))
+    {
+        return NULL;
+    }
+    if (!easy_flipper_set_widget(&app->widget_result, WebCrawlerViewWidgetResult, "Error, try again.", web_crawler_back_to_main_callback, &app->view_dispatcher))
     {
         return NULL;
     }

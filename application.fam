@@ -10,5 +10,5 @@ App(
     fap_description="Use Wi-Fi to access the internet and scrape data from the web.",
     fap_author="JBlanked",
     fap_weburl="https://github.com/jblanked/WebCrawler-FlipperZero",
-    fap_version = "0.7",
+    fap_version = "0.8",
 )

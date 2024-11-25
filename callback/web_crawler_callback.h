@@ -7,11 +7,7 @@ extern bool sent_http_request;
 extern bool get_success;
 extern bool already_success;
 
-void web_crawler_draw_error(Canvas *canvas);
-
 void web_crawler_http_method_change(VariableItem *item);
-
-void web_crawler_view_draw_callback(Canvas *canvas, void *context);
 
 /**
  * @brief      Navigation callback to handle exiting from other views to the submenu.
@@ -166,4 +162,49 @@ void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index);
 
 void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index);
+
+// Add edits by Derek Jamison
+typedef enum DataState DataState;
+enum DataState
+{
+    DataStateInitial,
+    DataStateRequested,
+    DataStateReceived,
+    DataStateParsed,
+    DataStateParseError,
+    DataStateError,
+};
+
+typedef enum WebCrawlerCustomEvent WebCrawlerCustomEvent;
+enum WebCrawlerCustomEvent
+{
+    WebCrawlerCustomEventProcess,
+};
+
+typedef struct DataLoaderModel DataLoaderModel;
+typedef bool (*DataLoaderFetch)(DataLoaderModel *model);
+typedef char *(*DataLoaderParser)(DataLoaderModel *model);
+struct DataLoaderModel
+{
+    char *title;
+    char *data_text;
+    DataState data_state;
+    DataLoaderFetch fetcher;
+    DataLoaderParser parser;
+    void *parser_context;
+    size_t request_index;
+    size_t request_count;
+    ViewNavigationCallback back_callback;
+    FuriTimer *timer;
+};
+
+void web_crawler_generic_switch_to_view(WebCrawlerApp *app, char *title, DataLoaderFetch fetcher, DataLoaderParser parser, size_t request_count, ViewNavigationCallback back, uint32_t view_id);
+
+void web_crawler_loader_draw_callback(Canvas *canvas, void *model);
+
+void web_crawler_loader_init(View *view);
+
+void web_crawler_loader_free_model(View *view);
+
+bool web_crawler_custom_event_callback(void *context, uint32_t index);
 #endif

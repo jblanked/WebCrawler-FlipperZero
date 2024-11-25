@@ -1,3 +1,8 @@
+## 0.8
+Updates from Derek Jamison:
+- Improved progress display.
+- Added connectivity check on startup.
+
 ## 0.7
 - Improved memory allocation
 - App restructured

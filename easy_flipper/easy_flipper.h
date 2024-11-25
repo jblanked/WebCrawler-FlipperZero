@@ -15,6 +15,8 @@
 #include <gui/modules/text_box.h>
 #include <gui/modules/variable_item_list.h>
 #include <gui/modules/dialog_ex.h>
+#include <notification/notification.h>
+#include <dialogs/dialogs.h>
 #include <gui/modules/popup.h>
 #include <gui/modules/loading.h>
 #include <text_input/uart_text_input.h>
