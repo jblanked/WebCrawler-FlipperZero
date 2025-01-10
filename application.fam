@@ -7,8 +7,8 @@ App(
     fap_icon="app.png",
     fap_category="GPIO",
     fap_icon_assets="assets",
-    fap_description="Use Wi-Fi to access the internet and scrape data from the web.",
+    fap_description="Browse the web, fetch API data, and more.",
     fap_author="JBlanked",
     fap_weburl="https://github.com/jblanked/WebCrawler-FlipperZero",
-    fap_version = "0.8",
+    fap_version = "1.0",
 )

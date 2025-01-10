@@ -12,13 +12,6 @@ WebCrawlerApp *web_crawler_app_alloc()
     // Open GUI
     Gui *gui = furi_record_open(RECORD_GUI);
 
-    // Initialize UART with the correct callback
-    if (!flipper_http_init(flipper_http_rx_callback, app))
-    {
-        FURI_LOG_E(TAG, "Failed to initialize UART");
-        return NULL;
-    }
-
     // Allocate ViewDispatcher
     if (!easy_flipper_set_view_dispatcher(&app->view_dispatcher, gui, app))
     {
@@ -176,7 +169,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     variable_item_set_current_value_text(app->file_delete_item, ""); // Initialize
 
     // Allocate Submenu views
-    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, "Web Crawler v0.8", web_crawler_exit_app_callback, &app->view_dispatcher))
+    if (!easy_flipper_set_submenu(&app->submenu_main, WebCrawlerViewSubmenuMain, VERSION_TAG, web_crawler_exit_app_callback, &app->view_dispatcher))
     {
         return NULL;
     }
@@ -202,7 +195,7 @@ WebCrawlerApp *web_crawler_app_alloc()
     web_crawler_loader_init(app->view_loader);
 
     //-- WIDGET ABOUT VIEW --
-    if (!easy_flipper_set_widget(&app->widget_about, WebCrawlerViewAbout, "Web Crawler App\n---\nThis is a web crawler app for Flipper Zero.\n---\nVisit github.com/jblanked for more details.\n---\nPress BACK to return.", web_crawler_back_to_main_callback, &app->view_dispatcher))
+    if (!easy_flipper_set_widget(&app->widget_about, WebCrawlerViewAbout, "Web Crawler App\n---\nBrowse the web, fetch API data, and more..\n---\nVisit github.com/jblanked for more details.\n---\nPress BACK to return.", web_crawler_back_to_main_callback, &app->view_dispatcher))
     {
         return NULL;
     }
@@ -308,9 +301,9 @@ WebCrawlerApp *web_crawler_app_alloc()
         }
 
         // set the file path for fhttp.file_path
-        char file_path[128];
-        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
-        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s", file_path);
+        // char file_path[128];
+        // snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        // snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s", file_path);
 
         // update temp buffers
         strncpy(app->temp_buffer_path, app->path, app->temp_buffer_size_path - 1);

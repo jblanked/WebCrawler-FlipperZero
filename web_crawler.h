@@ -10,6 +10,7 @@
 #include <storage/storage.h>
 
 #define TAG "Web Crawler"
+#define VERSION_TAG TAG " v1.0"
 extern char *http_method_names[];
 
 // Define the submenu items for our WebCrawler application
@@ -130,7 +131,5 @@ void free_all(WebCrawlerApp *app, char *reason);
  * @param      app  The WebCrawlerApp object to free.
  */
 void web_crawler_app_free(WebCrawlerApp *app);
-
-extern WebCrawlerApp *app_instance;
 
 #endif // WEB_CRAWLER_E

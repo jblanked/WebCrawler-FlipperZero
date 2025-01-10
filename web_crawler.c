@@ -192,8 +192,6 @@ void web_crawler_app_free(WebCrawlerApp *app)
         web_crawler_loader_free_model(app->view_loader);
         view_free(app->view_loader);
     }
-    // Deinitialize UART
-    flipper_http_deinit();
 
     // Remove and free Submenu
     if (app->submenu_main)
@@ -278,6 +276,4 @@ void web_crawler_app_free(WebCrawlerApp *app)
         free(app);
     }
 }
-
-WebCrawlerApp *app_instance = NULL;
 char *http_method_names[] = {"GET", "POST", "PUT", "DELETE", "DOWNLOAD"};

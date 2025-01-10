@@ -1,3 +1,8 @@
+## 1.0
+- Updated the HTTP Method toggle to work as intended.
+- Updated FlipperHTTP to the latest version.
+- Improved memory allocation
+
 ## 0.8
 Updates from Derek Jamison:
 - Improved progress display.

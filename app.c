@@ -9,54 +9,47 @@ int32_t web_crawler_app(void *p)
 {
     UNUSED(p);
 
-    app_instance = web_crawler_app_alloc();
-    if (!app_instance)
+    WebCrawlerApp *app = web_crawler_app_alloc();
+    if (!app)
     {
         FURI_LOG_E(TAG, "Failed to allocate WebCrawlerApp");
         return -1;
     }
 
-    if (!flipper_http_ping())
+    // check if board is connected (Derek Jamison)
+    FlipperHTTP *fhttp = flipper_http_alloc();
+    if (!fhttp)
     {
-        FURI_LOG_E(TAG, "Failed to ping the device");
+        easy_flipper_dialog("FlipperHTTP Error", "The UART is likely busy.\nEnsure you have the correct\nflash for your board then\nrestart your Flipper Zero.");
         return -1;
     }
 
-    // Edit from Derek Jamison
-    if (app_instance->text_input_ssid != NULL && app_instance->text_input_password != NULL)
+    if (!flipper_http_ping(fhttp))
     {
-        // Try to wait for pong response.
-        uint8_t counter = 10;
-        while (fhttp.state == INACTIVE && --counter > 0)
-        {
-            FURI_LOG_D(TAG, "Waiting for PONG");
-            furi_delay_ms(100);
-        }
+        FURI_LOG_E(TAG, "Failed to ping the device");
+        flipper_http_free(fhttp);
+        return -1;
+    }
 
-        if (counter == 0)
-        {
-            DialogsApp *dialogs = furi_record_open(RECORD_DIALOGS);
-            DialogMessage *message = dialog_message_alloc();
-            dialog_message_set_header(
-                message, "[FlipperHTTP Error]", 64, 0, AlignCenter, AlignTop);
-            dialog_message_set_text(
-                message,
-                "Ensure your WiFi Developer\nBoard or Pico W is connected\nand the latest FlipperHTTP\nfirmware is installed.",
-                0,
-                63,
-                AlignLeft,
-                AlignBottom);
-            dialog_message_show(dialogs, message);
-            dialog_message_free(message);
-            furi_record_close(RECORD_DIALOGS);
-        }
+    // Try to wait for pong response.
+    uint32_t counter = 10;
+    while (fhttp->state == INACTIVE && --counter > 0)
+    {
+        FURI_LOG_D(TAG, "Waiting for PONG");
+        furi_delay_ms(100); // this causes a BusFault
+    }
+
+    flipper_http_free(fhttp);
+    if (counter == 0)
+    {
+        easy_flipper_dialog("FlipperHTTP Error", "Ensure your WiFi Developer\nBoard or Pico W is connected\nand the latest FlipperHTTP\nfirmware is installed.");
     }
 
     // Run the application
-    view_dispatcher_run(app_instance->view_dispatcher);
+    view_dispatcher_run(app->view_dispatcher);
 
     // Free resources after the application loop ends
-    web_crawler_app_free(app_instance);
+    web_crawler_app_free(app);
 
     return 0;
 }

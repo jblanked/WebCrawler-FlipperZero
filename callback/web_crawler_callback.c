@@ -10,21 +10,15 @@
 #define DEV_CRASH()
 #endif
 
-bool sent_http_request = false;
-bool get_success = false;
-bool already_success = false;
-
-static void web_crawler_draw_error(Canvas *canvas)
+static void web_crawler_draw_error(Canvas *canvas, DataLoaderModel *model)
 {
-    if (!canvas)
-    {
-        FURI_LOG_E(TAG, "Canvas is NULL");
-        return;
-    }
+    furi_check(model, "DataLoaderModel is NULL");
+    furi_check(model->fhttp, "FlipperHTTP is NULL");
+    furi_check(canvas, "Canvas is NULL");
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
 
-    if (fhttp.state == INACTIVE)
+    if (model->fhttp->state == INACTIVE)
     {
         canvas_draw_str(canvas, 0, 7, "Wifi Dev Board disconnected.");
         canvas_draw_str(canvas, 0, 17, "Please connect to the board.");
@@ -35,30 +29,30 @@ static void web_crawler_draw_error(Canvas *canvas)
         return;
     }
 
-    if (fhttp.last_response)
+    if (model->fhttp->last_response)
     {
-        if (strstr(fhttp.last_response, "[ERROR] Not connected to Wifi. Failed to reconnect.") != NULL)
+        if (strstr(model->fhttp->last_response, "[ERROR] Not connected to Wifi. Failed to reconnect.") != NULL)
         {
             canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
             canvas_draw_str(canvas, 0, 50, "Update your WiFi settings.");
             canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
             return;
         }
-        if (strstr(fhttp.last_response, "[ERROR] Failed to connect to Wifi.") != NULL)
+        if (strstr(model->fhttp->last_response, "[ERROR] Failed to connect to Wifi.") != NULL)
         {
             canvas_draw_str(canvas, 0, 10, "[ERROR] Not connected to Wifi.");
             canvas_draw_str(canvas, 0, 50, "Update your WiFi settings.");
             canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
             return;
         }
-        if (strstr(fhttp.last_response, "[ERROR] GET request failed with error: connection refused") != NULL)
+        if (strstr(model->fhttp->last_response, "[ERROR] GET request failed with error: connection refused") != NULL)
         {
             canvas_draw_str(canvas, 0, 10, "[ERROR] Connection refused.");
             canvas_draw_str(canvas, 0, 50, "Choose another URL.");
             canvas_draw_str(canvas, 0, 60, "Press BACK to return.");
             return;
         }
-        if (strstr(fhttp.last_response, "[PONG]") != NULL)
+        if (strstr(model->fhttp->last_response, "[PONG]") != NULL)
         {
             canvas_clear(canvas);
             canvas_draw_str(canvas, 0, 10, "[STATUS]Connecting to AP...");
@@ -79,95 +73,100 @@ static void web_crawler_draw_error(Canvas *canvas)
 
 void web_crawler_http_method_change(VariableItem *item)
 {
+    WebCrawlerApp *app = (WebCrawlerApp *)variable_item_get_context(item);
+    furi_check(app, "WebCrawlerApp is NULL");
     uint8_t index = variable_item_get_current_value_index(item);
     variable_item_set_current_value_text(item, http_method_names[index]);
+    variable_item_set_current_value_index(item, index);
 
     // save the http method
-    if (app_instance)
+    if (app)
     {
-        strncpy(app_instance->http_method, http_method_names[index], strlen(http_method_names[index]) + 1);
+        strncpy(app->http_method, http_method_names[index], strlen(http_method_names[index]) + 1);
 
         // save the settings
         save_settings(
-            app_instance->path,
-            app_instance->ssid,
-            app_instance->password,
-            app_instance->file_rename,
-            app_instance->file_type,
-            app_instance->http_method,
-            app_instance->headers,
-            app_instance->payload);
+            app->path,
+            app->ssid,
+            app->password,
+            app->file_rename,
+            app->file_type,
+            app->http_method,
+            app->headers,
+            app->payload);
     }
 }
 
 static bool web_crawler_fetch(DataLoaderModel *model)
 {
-    UNUSED(model);
-    if (app_instance->file_type && app_instance->file_rename)
+    WebCrawlerApp *app = (WebCrawlerApp *)model->parser_context;
+    furi_check(app, "WebCrawlerApp is NULL");
+    furi_check(model->fhttp, "FlipperHTTP is NULL");
+    if (app->file_type && app->file_rename)
     {
         snprintf(
-            fhttp.file_path,
-            sizeof(fhttp.file_path),
+            model->fhttp->file_path,
+            sizeof(model->fhttp->file_path),
             STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/%s%s",
-            app_instance->file_rename,
-            app_instance->file_type);
+            app->file_rename,
+            app->file_type);
     }
     else
     {
         snprintf(
-            fhttp.file_path,
-            sizeof(fhttp.file_path),
+            model->fhttp->file_path,
+            sizeof(model->fhttp->file_path),
             STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
     }
 
-    if (strstr(app_instance->http_method, "GET") != NULL)
+    if (strstr(app->http_method, "GET") != NULL)
     {
-        fhttp.save_received_data = true;
-        fhttp.is_bytes_request = false;
+        model->fhttp->save_received_data = true;
+        model->fhttp->is_bytes_request = false;
 
         // Perform GET request and handle the response
-        if (app_instance->headers == NULL || app_instance->headers[0] == '\0' || strstr(app_instance->headers, " ") == NULL)
+        if (app->headers == NULL || app->headers[0] == '\0' || strstr(app->headers, " ") == NULL)
         {
-            get_success = flipper_http_get_request(app_instance->path);
+            return flipper_http_get_request(model->fhttp, app->path);
         }
         else
         {
-            get_success = flipper_http_get_request_with_headers(app_instance->path, app_instance->headers);
+            return flipper_http_get_request_with_headers(model->fhttp, app->path, app->headers);
         }
     }
-    else if (strstr(app_instance->http_method, "POST") != NULL)
+    else if (strstr(app->http_method, "POST") != NULL)
     {
-        fhttp.save_received_data = true;
-        fhttp.is_bytes_request = false;
+        model->fhttp->save_received_data = true;
+        model->fhttp->is_bytes_request = false;
 
         // Perform POST request and handle the response
-        get_success = flipper_http_post_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+        return flipper_http_post_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
     }
-    else if (strstr(app_instance->http_method, "PUT") != NULL)
+    else if (strstr(app->http_method, "PUT") != NULL)
     {
-        fhttp.save_received_data = true;
-        fhttp.is_bytes_request = false;
+        model->fhttp->save_received_data = true;
+        model->fhttp->is_bytes_request = false;
 
         // Perform PUT request and handle the response
-        get_success = flipper_http_put_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+        return flipper_http_put_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
     }
-    else if (strstr(app_instance->http_method, "DELETE") != NULL)
+    else if (strstr(app->http_method, "DELETE") != NULL)
     {
-        fhttp.save_received_data = true;
-        fhttp.is_bytes_request = false;
+        model->fhttp->save_received_data = true;
+        model->fhttp->is_bytes_request = false;
 
         // Perform DELETE request and handle the response
-        get_success = flipper_http_delete_request_with_headers(app_instance->path, app_instance->headers, app_instance->payload);
+        return flipper_http_delete_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
     }
     else
     {
-        fhttp.save_received_data = false;
-        fhttp.is_bytes_request = true;
+        model->fhttp->save_received_data = false;
+        model->fhttp->is_bytes_request = true;
 
         // Perform GET request and handle the response
-        get_success = flipper_http_get_request_bytes(app_instance->path, app_instance->headers);
+        return flipper_http_get_request_bytes(model->fhttp, app->path, app->headers);
     }
-    return get_success;
+    return false;
 }
 
 static char *web_crawler_parse(DataLoaderModel *model)
@@ -179,20 +178,21 @@ static char *web_crawler_parse(DataLoaderModel *model)
 
 static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
 {
+    furi_check(app, "WebCrawlerApp is NULL");
     char *title = "GET Request";
-    if (strstr(app_instance->http_method, "GET") != NULL)
+    if (strstr(app->http_method, "GET") != NULL)
     {
         title = "GET Request";
     }
-    else if (strstr(app_instance->http_method, "POST") != NULL)
+    else if (strstr(app->http_method, "POST") != NULL)
     {
         title = "POST Request";
     }
-    else if (strstr(app_instance->http_method, "PUT") != NULL)
+    else if (strstr(app->http_method, "PUT") != NULL)
     {
         title = "PUT Request";
     }
-    else if (strstr(app_instance->http_method, "DELETE") != NULL)
+    else if (strstr(app->http_method, "DELETE") != NULL)
     {
         title = "DELETE Request";
     }
@@ -210,12 +210,8 @@ static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
  */
 uint32_t web_crawler_back_to_configure_callback(void *context)
 {
-    UNUSED(context);
-    // free file read widget if it exists
-    if (app_instance->widget_file_read)
-    {
-        widget_reset(app_instance->widget_file_read);
-    }
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app, "WebCrawlerApp is NULL");
     return WebCrawlerViewSubmenuConfig; // Return to the configure screen
 }
 
@@ -226,16 +222,8 @@ uint32_t web_crawler_back_to_configure_callback(void *context)
  */
 uint32_t web_crawler_back_to_main_callback(void *context)
 {
-    UNUSED(context);
-    // reset GET request flags
-    sent_http_request = false;
-    get_success = false;
-    already_success = false;
-    // free file read widget if it exists
-    if (app_instance->widget_file_read)
-    {
-        widget_reset(app_instance->widget_file_read);
-    }
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app, "WebCrawlerApp is NULL");
     return WebCrawlerViewSubmenuMain; // Return to the main submenu
 }
 
@@ -276,13 +264,12 @@ uint32_t web_crawler_exit_app_callback(void *context)
 void web_crawler_submenu_callback(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-
+    furi_check(app, "WebCrawlerApp is NULL");
     if (app->view_dispatcher)
     {
         switch (index)
         {
         case WebCrawlerSubmenuIndexRun:
-            sent_http_request = false; // Reset the flag
             web_crawler_data_switch_to_view(app);
             break;
         case WebCrawlerSubmenuIndexAbout:
@@ -391,11 +378,7 @@ void web_crawler_request_enter_callback(void *context, uint32_t index)
 void web_crawler_set_path_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->path || !app->temp_buffer_path || !app->temp_buffer_size_path || !app->path_item)
     {
         FURI_LOG_E(TAG, "Invalid path buffer");
@@ -423,11 +406,7 @@ void web_crawler_set_path_updated(void *context)
 void web_crawler_set_headers_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->temp_buffer_headers || !app->temp_buffer_size_headers || !app->headers_item)
     {
         FURI_LOG_E(TAG, "Invalid headers buffer");
@@ -455,11 +434,7 @@ void web_crawler_set_headers_updated(void *context)
 void web_crawler_set_payload_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->temp_buffer_payload || !app->temp_buffer_size_payload || !app->payload_item)
     {
         FURI_LOG_E(TAG, "Invalid payload buffer");
@@ -487,11 +462,9 @@ void web_crawler_set_payload_updated(void *context)
 void web_crawler_set_ssid_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
+    FlipperHTTP *fhttp = flipper_http_alloc();
+    furi_check(fhttp, "FlipperHTTP is NULL");
     if (!app->temp_buffer_ssid || !app->temp_buffer_size_ssid || !app->ssid || !app->ssid_item)
     {
         FURI_LOG_E(TAG, "Invalid SSID buffer");
@@ -508,13 +481,13 @@ void web_crawler_set_ssid_updated(void *context)
         save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
-        if (!flipper_http_save_wifi(app->ssid, app->password))
+        if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
         {
             FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
     }
-
+    flipper_http_free(fhttp);
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
 }
@@ -526,11 +499,9 @@ void web_crawler_set_ssid_updated(void *context)
 void web_crawler_set_password_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
+    FlipperHTTP *fhttp = flipper_http_alloc();
+    furi_check(fhttp, "FlipperHTTP is NULL");
     if (!app->temp_buffer_password || !app->temp_buffer_size_password || !app->password || !app->password_item)
     {
         FURI_LOG_E(TAG, "Invalid password buffer");
@@ -547,13 +518,13 @@ void web_crawler_set_password_update(void *context)
         save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
-        if (!flipper_http_save_wifi(app->ssid, app->password))
+        if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
         {
             FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
     }
-
+    flipper_http_free(fhttp);
     // Return to the Configure view
     view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
 }
@@ -565,11 +536,7 @@ void web_crawler_set_password_update(void *context)
 void web_crawler_set_file_type_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->temp_buffer_file_type || !app->temp_buffer_size_file_type || !app->file_type || !app->file_type_item)
     {
         FURI_LOG_E(TAG, "Invalid file type buffer");
@@ -592,14 +559,14 @@ void web_crawler_set_file_type_update(void *context)
 
     rename_received_data(app->file_rename, app->file_rename, app->file_type, old_file_type);
 
-    // set the file path for fhttp.file_path
+    // set the file path for fhttp->file_path
     if (app->file_rename && app->file_type)
     {
         char file_path[256];
         snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
         file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
-        strncpy(fhttp.file_path, file_path, sizeof(fhttp.file_path) - 1);
-        fhttp.file_path[sizeof(fhttp.file_path) - 1] = '\0'; // Null-terminate
+        // strncpy(fhttp->file_path, file_path, sizeof(fhttp->file_path) - 1);
+        // fhttp->file_path[sizeof(fhttp->file_path) - 1] = '\0'; // Null-terminate
     }
 
     // Return to the Configure view
@@ -613,11 +580,7 @@ void web_crawler_set_file_type_update(void *context)
 void web_crawler_set_file_rename_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->temp_buffer_file_rename || !app->temp_buffer_size_file_rename || !app->file_rename || !app->file_rename_item)
     {
         FURI_LOG_E(TAG, "Invalid file rename buffer");
@@ -644,14 +607,14 @@ void web_crawler_set_file_rename_update(void *context)
 
     rename_received_data(old_name, app->file_rename, app->file_type, app->file_type);
 
-    // set the file path for fhttp.file_path
+    // set the file path for fhttp->file_path
     if (app->file_rename && app->file_type)
     {
         char file_path[256];
         snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
         file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
-        strncpy(fhttp.file_path, file_path, sizeof(fhttp.file_path) - 1);
-        fhttp.file_path[sizeof(fhttp.file_path) - 1] = '\0'; // Null-terminate
+        // strncpy(fhttp->file_path, file_path, sizeof(fhttp->file_path) - 1);
+        // fhttp->file_path[sizeof(fhttp->file_path) - 1] = '\0'; // Null-terminate
     }
 
     // Return to the Configure view
@@ -666,11 +629,7 @@ void web_crawler_set_file_rename_update(void *context)
 void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     if (!app->text_input_path)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
@@ -718,11 +677,7 @@ void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_headers)
     {
@@ -779,11 +734,7 @@ void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_payload)
     {
@@ -830,11 +781,7 @@ void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_ssid)
     {
@@ -881,11 +828,7 @@ void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_password)
     {
@@ -924,11 +867,7 @@ void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_file_type)
     {
@@ -975,11 +914,7 @@ void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     if (!app->text_input_file_rename)
     {
@@ -1026,11 +961,7 @@ void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
 
     if (!delete_received_data(app))
@@ -1050,25 +981,21 @@ void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index)
 void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    if (!app)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return;
-    }
+    furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
     widget_reset(app->widget_file_read);
-
+    char file_path[256];
     if (app->file_rename && app->file_type)
     {
-        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
     }
     else
     {
-        snprintf(fhttp.file_path, sizeof(fhttp.file_path), "%s%s%s", RECEIVED_DATA_PATH, "received_data", ".txt");
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, "received_data", ".txt");
     }
 
     // load the received data from the saved file
-    FuriString *received_data = flipper_http_load_from_file(fhttp.file_path);
+    FuriString *received_data = flipper_http_load_from_file(file_path);
     if (received_data == NULL)
     {
         FURI_LOG_E(TAG, "Failed to load received data from file.");
@@ -1084,24 +1011,7 @@ void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
         }
         return;
     }
-    const char *data_cstr = furi_string_get_cstr(received_data);
-    if (data_cstr == NULL)
-    {
-        FURI_LOG_E(TAG, "Failed to get C-string from FuriString.");
-        furi_string_free(received_data);
-        if (app->widget_file_read)
-        {
-            widget_add_text_scroll_element(
-                app->widget_file_read,
-                0,
-                0,
-                128,
-                64, "File is empty.");
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
-        }
-        return;
-    }
-    widget_add_text_scroll_element(app_instance->widget_file_read, 0, 0, 128, 64, data_cstr);
+    widget_add_text_scroll_element(app->widget_file_read, 0, 0, 128, 64, furi_string_get_cstr(received_data));
     furi_string_free(received_data);
 
     // Set the previous callback to return to Configure screen
@@ -1224,8 +1134,8 @@ void web_crawler_loader_draw_callback(Canvas *canvas, void *model)
         return;
     }
 
-    SerialState http_state = fhttp.state;
     DataLoaderModel *data_loader_model = (DataLoaderModel *)model;
+    SerialState http_state = data_loader_model->fhttp->state;
     DataState data_state = data_loader_model->data_state;
     char *title = data_loader_model->title;
 
@@ -1244,7 +1154,7 @@ void web_crawler_loader_draw_callback(Canvas *canvas, void *model)
 
     if (data_state == DataStateError || data_state == DataStateParseError)
     {
-        web_crawler_draw_error(canvas);
+        web_crawler_draw_error(canvas, data_loader_model);
         return;
     }
 
@@ -1258,7 +1168,7 @@ void web_crawler_loader_draw_callback(Canvas *canvas, void *model)
 
     if (http_state == SENDING)
     {
-        canvas_draw_str(canvas, 0, 27, "Sending...");
+        canvas_draw_str(canvas, 0, 27, "Fetching...");
         return;
     }
 
@@ -1294,7 +1204,14 @@ static void web_crawler_loader_process_callback(void *context)
     View *view = app->view_loader;
 
     DataState current_data_state;
-    with_view_model(view, DataLoaderModel * model, { current_data_state = model->data_state; }, false);
+    DataLoaderModel *loader_model = NULL;
+    with_view_model(view, DataLoaderModel * model, { current_data_state = model->data_state; loader_model = model; }, false);
+    if (!loader_model || !loader_model->fhttp)
+    {
+        FURI_LOG_E(TAG, "Model or fhttp is NULL");
+        DEV_CRASH();
+        return;
+    }
 
     if (current_data_state == DataStateInitial)
     {
@@ -1312,7 +1229,7 @@ static void web_crawler_loader_process_callback(void *context)
                 }
 
                 // Clear any previous responses
-                strncpy(fhttp.last_response, "", 1);
+                strncpy(model->fhttp->last_response, "", 1);
                 bool request_status = fetch(model);
                 if (!request_status)
                 {
@@ -1323,21 +1240,21 @@ static void web_crawler_loader_process_callback(void *context)
     }
     else if (current_data_state == DataStateRequested || current_data_state == DataStateError)
     {
-        if (fhttp.state == IDLE && fhttp.last_response != NULL)
+        if (loader_model->fhttp->state == IDLE && loader_model->fhttp->last_response != NULL)
         {
-            if (strstr(fhttp.last_response, "[PONG]") != NULL)
+            if (strstr(loader_model->fhttp->last_response, "[PONG]") != NULL)
             {
                 FURI_LOG_DEV(TAG, "PONG received.");
             }
-            else if (strncmp(fhttp.last_response, "[SUCCESS]", 9) == 0)
+            else if (strncmp(loader_model->fhttp->last_response, "[SUCCESS]", 9) == 0)
             {
-                FURI_LOG_DEV(TAG, "SUCCESS received. %s", fhttp.last_response ? fhttp.last_response : "NULL");
+                FURI_LOG_DEV(TAG, "SUCCESS received. %s", loader_model->fhttp->last_response ? loader_model->fhttp->last_response : "NULL");
             }
-            else if (strncmp(fhttp.last_response, "[ERROR]", 9) == 0)
+            else if (strncmp(loader_model->fhttp->last_response, "[ERROR]", 9) == 0)
             {
-                FURI_LOG_DEV(TAG, "ERROR received. %s", fhttp.last_response ? fhttp.last_response : "NULL");
+                FURI_LOG_DEV(TAG, "ERROR received. %s", loader_model->fhttp->last_response ? loader_model->fhttp->last_response : "NULL");
             }
-            else if (strlen(fhttp.last_response) == 0)
+            else if (strlen(loader_model->fhttp->last_response) == 0)
             {
                 // Still waiting on response
             }
@@ -1346,21 +1263,21 @@ static void web_crawler_loader_process_callback(void *context)
                 with_view_model(view, DataLoaderModel * model, { model->data_state = DataStateReceived; }, true);
             }
         }
-        else if (fhttp.state == SENDING || fhttp.state == RECEIVING)
+        else if (loader_model->fhttp->state == SENDING || loader_model->fhttp->state == RECEIVING)
         {
             // continue waiting
         }
-        else if (fhttp.state == INACTIVE)
+        else if (loader_model->fhttp->state == INACTIVE)
         {
             // inactive. try again
         }
-        else if (fhttp.state == ISSUE)
+        else if (loader_model->fhttp->state == ISSUE)
         {
             with_view_model(view, DataLoaderModel * model, { model->data_state = DataStateError; }, true);
         }
         else
         {
-            FURI_LOG_DEV(TAG, "Unexpected state: %d lastresp: %s", fhttp.state, fhttp.last_response ? fhttp.last_response : "NULL");
+            FURI_LOG_DEV(TAG, "Unexpected state: %d lastresp: %s", loader_model->fhttp->state, loader_model->fhttp->last_response ? loader_model->fhttp->last_response : "NULL");
             DEV_CRASH();
         }
     }
@@ -1381,7 +1298,7 @@ static void web_crawler_loader_process_callback(void *context)
                 {
                     data_text = model->parser(model);
                 }
-                FURI_LOG_DEV(TAG, "Parsed data: %s\r\ntext: %s", fhttp.last_response ? fhttp.last_response : "NULL", data_text ? data_text : "NULL");
+                FURI_LOG_DEV(TAG, "Parsed data: %s\r\ntext: %s", model->fhttp->last_response ? model->fhttp->last_response : "NULL", data_text ? data_text : "NULL");
                 model->data_text = data_text;
                 if (data_text == NULL)
                 {
@@ -1406,14 +1323,14 @@ static void web_crawler_loader_process_callback(void *context)
                 }
                 else
                 {
-                    web_crawler_widget_set_text(model->data_text != NULL ? model->data_text : "Empty result", &app_instance->widget_result);
+                    web_crawler_widget_set_text(model->data_text != NULL ? model->data_text : "", &app->widget_result);
                     if (model->data_text != NULL)
                     {
                         free(model->data_text);
                         model->data_text = NULL;
                     }
-                    view_set_previous_callback(widget_get_view(app_instance->widget_result), model->back_callback);
-                    view_dispatcher_switch_to_view(app_instance->view_dispatcher, WebCrawlerViewWidgetResult);
+                    view_set_previous_callback(widget_get_view(app->widget_result), model->back_callback);
+                    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewWidgetResult);
                 }
             },
             true);
@@ -1510,8 +1427,14 @@ void web_crawler_loader_free_model(View *view)
             }
             if (model->parser_context)
             {
-                free(model->parser_context);
-                model->parser_context = NULL;
+                // do not free the context here, it is the app context
+                // free(model->parser_context);
+                // model->parser_context = NULL;
+            }
+            if (model->fhttp)
+            {
+                flipper_http_free(model->fhttp);
+                model->fhttp = NULL;
             }
         },
         false);
@@ -1566,6 +1489,12 @@ void web_crawler_generic_switch_to_view(WebCrawlerApp *app, char *title, DataLoa
             model->back_callback = back;
             model->data_state = DataStateInitial;
             model->data_text = NULL;
+            //
+            model->parser_context = app;
+            if (!model->fhttp)
+            {
+                model->fhttp = flipper_http_alloc();
+            }
         },
         true);
 

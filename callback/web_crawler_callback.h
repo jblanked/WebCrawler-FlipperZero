@@ -3,10 +3,6 @@
 #include "web_crawler.h"
 #include <flip_storage/web_crawler_storage.h>
 
-extern bool sent_http_request;
-extern bool get_success;
-extern bool already_success;
-
 void web_crawler_http_method_change(VariableItem *item);
 
 /**
@@ -196,6 +192,7 @@ struct DataLoaderModel
     size_t request_count;
     ViewNavigationCallback back_callback;
     FuriTimer *timer;
+    FlipperHTTP *fhttp;
 };
 
 void web_crawler_generic_switch_to_view(WebCrawlerApp *app, char *title, DataLoaderFetch fetcher, DataLoaderParser parser, size_t request_count, ViewNavigationCallback back, uint32_t view_id);
