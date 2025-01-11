@@ -4,7 +4,6 @@ Configure and manage HTTP requests directly from your Flipper Zero.
 - WiFi Developer Board, Raspberry Pi, or ESP32 device with the FlipperHTTP Flash: https://github.com/jblanked/FlipperHTTP
 - 2.4 GHz WiFi Access Point
 
-
 ## Installation
 - Download from the Official Flipper App Store: https://lab.flipper.net/apps/web_crawler
 - Video tutorial: https://www.youtube.com/watch?v=lkui2Smckq4
@@ -50,7 +49,7 @@ Configure and manage HTTP requests directly from your Flipper Zero.
    - Enter the complete URL of the website you intend to crawl (e.g., https://www.example.com/).
 
 2. **HTTP Method**
-   - Choose between GET, POST, DELETE, PUT, and DOWNLOAD.
+   - Choose between GET, POST, DELETE, PUT, DOWNLOAD, and BROWSE.
 
 3. **Headers**
    - Add your required headers to be used in your HTTP requests

@@ -48,4 +48,4 @@ void web_crawler_app_free(WebCrawlerApp *app)
     view_dispatcher_free(app->view_dispatcher);
     free(app);
 }
-char *http_method_names[] = {"GET", "POST", "PUT", "DELETE", "DOWNLOAD"};
+char *http_method_names[] = {"GET", "POST", "PUT", "DELETE", "DOWNLOAD", "BROWSE"};

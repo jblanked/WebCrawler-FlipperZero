@@ -178,7 +178,7 @@ static bool alloc_variable_item_list(WebCrawlerApp *app, uint32_t view)
         }
         if (!app->http_method_item)
         {
-            app->http_method_item = variable_item_list_add(app->variable_item_list, "HTTP Method", 5, web_crawler_http_method_change, app);
+            app->http_method_item = variable_item_list_add(app->variable_item_list, "HTTP Method", 6, web_crawler_http_method_change, app);
             variable_item_set_current_value_text(app->http_method_item, ""); // Initialize
             variable_item_set_current_value_index(app->http_method_item, 0); // Initialize
         }
@@ -207,6 +207,7 @@ static bool alloc_variable_item_list(WebCrawlerApp *app, uint32_t view)
                                                      : strstr(http_method, "PUT") != NULL      ? 2
                                                      : strstr(http_method, "DELETE") != NULL   ? 3
                                                      : strstr(http_method, "DOWNLOAD") != NULL ? 4
+                                                     : strstr(http_method, "BROWSE") != NULL   ? 5
                                                                                                : 0);
         }
         else
@@ -704,7 +705,7 @@ static bool web_crawler_fetch(DataLoaderModel *model)
         // Perform DELETE request and handle the response
         return flipper_http_delete_request_with_headers(model->fhttp, url, headers, payload);
     }
-    else
+    else if (strstr(http_method, "DOWNLOAD") != NULL)
     {
         model->fhttp->save_received_data = false;
         model->fhttp->is_bytes_request = true;
@@ -712,39 +713,93 @@ static bool web_crawler_fetch(DataLoaderModel *model)
         // Perform GET request and handle the response
         return flipper_http_get_request_bytes(model->fhttp, url, headers);
     }
+    else // BROWSE
+    {
+        model->fhttp->save_received_data = true;
+        model->fhttp->is_bytes_request = false;
+
+        // Perform GET request and handle the response
+        if (strlen(headers) == 0)
+        {
+            return flipper_http_get_request(model->fhttp, url);
+        }
+        else
+        {
+            return flipper_http_get_request_with_headers(model->fhttp, url, headers);
+        }
+    }
     return false;
 }
 
 static char *web_crawler_parse(DataLoaderModel *model)
 {
     UNUSED(model);
-    // there is no parsing since everything is saved to file
+    // parse HTML response if BROWSE request
+    char http_method[16];
+    if (!load_char("http_method", http_method, 16))
+    {
+        FURI_LOG_E(TAG, "Failed to load http method");
+    }
+    else
+    {
+        if (strstr(http_method, "BROWSE") != NULL)
+        {
+            // parse HTML then return response
+            return "HTML response parsed.\nPress BACK to return.";
+        }
+    }
     return "Data saved to file.\nPress BACK to return.";
 }
 
 static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
 {
     furi_check(app, "web_crawler_data_switch_to_view: WebCrawlerApp is NULL");
-    char *title = "GET Request";
-    if (strstr(app->http_method, "GET") != NULL)
+
+    // Allocate title on the heap.
+    char *title = malloc(32);
+    if (title == NULL)
     {
-        title = "GET Request";
+        FURI_LOG_E(TAG, "Failed to allocate memory for title");
+        return; // or handle the error as needed
     }
-    else if (strstr(app->http_method, "POST") != NULL)
+
+    char http_method[16];
+    if (!load_char("http_method", http_method, sizeof(http_method)))
     {
-        title = "POST Request";
-    }
-    else if (strstr(app->http_method, "PUT") != NULL)
-    {
-        title = "PUT Request";
-    }
-    else if (strstr(app->http_method, "DELETE") != NULL)
-    {
-        title = "DELETE Request";
+        FURI_LOG_E(TAG, "Failed to load http method");
+        snprintf(title, 32, "Request");
     }
     else
     {
-        title = "File Download";
+        if (strstr(http_method, "GET") != NULL)
+        {
+            snprintf(title, 32, "GET Request");
+        }
+        else if (strstr(http_method, "POST") != NULL)
+        {
+            snprintf(title, 32, "POST Request");
+        }
+        else if (strstr(http_method, "PUT") != NULL)
+        {
+            snprintf(title, 32, "PUT Request");
+        }
+        else if (strstr(http_method, "DELETE") != NULL)
+        {
+            snprintf(title, 32, "DELETE Request");
+        }
+        else if (strstr(http_method, "DOWNLOAD") != NULL)
+        {
+            snprintf(title, 32, "File Download");
+        }
+        else if (strstr(http_method, "BROWSE") != NULL)
+        {
+            snprintf(title, 32, "Browse URL");
+        }
+        else
+        {
+            // Provide a default title if no known http method is found.
+            snprintf(title, 32, "Request");
+        }
     }
     web_crawler_generic_switch_to_view(app, title, web_crawler_fetch, web_crawler_parse, 1, web_crawler_back_to_main_callback, WebCrawlerViewLoader);
 }
