@@ -239,36 +239,17 @@ bool load_settings(
         return false;
     }
 
-    // set the path, ssid, and password
-    strncpy(app->path, path, path_size);
-    strncpy(app->ssid, ssid, ssid_size);
-    strncpy(app->password, password, password_size);
-    strncpy(app->file_rename, file_rename, file_rename_size);
-    strncpy(app->file_type, file_type, file_type_size);
-    strncpy(app->http_method, http_method, http_method_size);
-    strncpy(app->headers, headers, headers_size);
-    strncpy(app->payload, payload, payload_size);
-
     storage_file_close(file);
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
     return true;
 }
 
-bool delete_received_data(WebCrawlerApp *app)
+bool delete_received_data()
 {
-    if (app == NULL)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return false;
-    }
     // Open the storage record
     Storage *storage = furi_record_open(RECORD_STORAGE);
-    if (!storage)
-    {
-        FURI_LOG_E(TAG, "Failed to open storage record");
-        return false;
-    }
+    furi_check(storage, "Failed to open storage record");
 
     if (!storage_simply_remove_recursive(storage, RECEIVED_DATA_PATH "received_data.txt"))
     {
@@ -286,13 +267,19 @@ bool delete_received_data(WebCrawlerApp *app)
         return false;
     }
 
-    if (app->file_type == NULL || strlen(app->file_type) == 0)
+    char file_type[16];
+    if (!load_char("file_type", file_type, sizeof(file_type)))
     {
-        app->file_type = ".txt";
+        snprintf(file_type, sizeof(file_type), ".txt");
+    }
+    char file_rename[128];
+    if (!load_char("file_rename", file_rename, sizeof(file_rename)))
+    {
+        snprintf(file_rename, sizeof(file_rename), "received_data");
     }
 
     // Format the new_path
-    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, file_rename, file_type);
     if (ret_new < 0 || (size_t)ret_new >= 256)
     {
         FURI_LOG_E(TAG, "Failed to create new_path");

@@ -1,4 +1,5 @@
 #include <callback/web_crawler_callback.h>
+#include <storage/storage.h>
 
 // Below added by Derek Jamison
 // FURI_LOG_DEV will log only during app development. Be sure that Settings/System/Log Device is "LPUART"; so we dont use serial port.
@@ -9,11 +10,514 @@
 #define FURI_LOG_DEV(tag, format, ...)
 #define DEV_CRASH()
 #endif
+static uint32_t web_crawler_back_to_file_callback(void *context);
+static bool alloc_widget(WebCrawlerApp *app, uint32_t view)
+{
+    furi_check(app, "alloc_widget: app is NULL");
+    if (!app->widget)
+    {
+        switch (view)
+        {
+        case WebCrawlerViewAbout:
+            return easy_flipper_set_widget(&app->widget, WebCrawlerViewWidget, "Web Crawler App\n---\nBrowse the web, fetch API data, and more..\n---\nVisit github.com/jblanked for more details.\n---\nPress BACK to return.", web_crawler_back_to_main_callback, &app->view_dispatcher);
+        case WebCrawlerViewFileRead:
+            return easy_flipper_set_widget(&app->widget, WebCrawlerViewWidget, "Data will be displayed here.", web_crawler_back_to_file_callback, &app->view_dispatcher);
+        case WebCrawlerViewFileDelete:
+            return easy_flipper_set_widget(&app->widget, WebCrawlerViewWidget, "File deleted.", web_crawler_back_to_file_callback, &app->view_dispatcher);
+        }
+    }
+    return false;
+}
+static void free_widget(WebCrawlerApp *app)
+{
+    if (app->widget)
+    {
+        view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewWidget);
+        free(app->widget);
+        app->widget = NULL;
+    }
+}
+static bool alloc_submenu_config(WebCrawlerApp *app)
+{
+    furi_check(app, "alloc_submenu_config: WebCrawlerApp is NULL");
+    if (app->submenu_config)
+    {
+        FURI_LOG_E(TAG, "alloc_submenu_config: Submenu already allocated");
+        return false;
+    }
+    if (easy_flipper_set_submenu(&app->submenu_config, WebCrawlerViewSubmenuConfig, "Settings", web_crawler_back_to_main_callback, &app->view_dispatcher))
+    {
+        submenu_add_item(app->submenu_config, "WiFi", WebCrawlerSubmenuIndexWifi, web_crawler_submenu_callback, app);
+        submenu_add_item(app->submenu_config, "File", WebCrawlerSubmenuIndexFile, web_crawler_submenu_callback, app);
+        submenu_add_item(app->submenu_config, "Request", WebCrawlerSubmenuIndexRequest, web_crawler_submenu_callback, app);
+        return true;
+    }
+    return false;
+}
+static void free_submenu_config(WebCrawlerApp *app)
+{
+    furi_check(app, "free_submenu_config: WebCrawlerApp is NULL");
+    if (app->submenu_config)
+    {
+        view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig);
+        submenu_free(app->submenu_config);
+        app->submenu_config = NULL;
+    }
+}
 
+static bool alloc_variable_item_list(WebCrawlerApp *app, uint32_t view)
+{
+    furi_check(app, "alloc_variable_item_list: WebCrawlerApp is NULL");
+    if (app->variable_item_list)
+    {
+        FURI_LOG_E(TAG, "Variable Item List already allocated");
+        return false;
+    }
+    bool settings_loaded = true;
+    // load settings
+    char path[128];
+    char ssid[64];
+    char password[64];
+    char file_rename[128];
+    char file_type[16];
+    char http_method[16];
+    char headers[256];
+    char payload[256];
+    if (!load_settings(path, 128, ssid, 64, password, 64, file_rename, 128, file_type, 16, http_method, 16, headers, 256, payload, 256, app))
+    {
+        FURI_LOG_E(TAG, "Failed to load settings");
+        settings_loaded = false;
+    }
+    switch (view)
+    {
+    case WebCrawlerViewVariableItemListWifi:
+        if (!easy_flipper_set_variable_item_list(&app->variable_item_list, WebCrawlerViewVariableItemList, web_crawler_wifi_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (!app->ssid_item)
+        {
+            app->ssid_item = variable_item_list_add(app->variable_item_list, "SSID", 0, NULL, NULL); // index 0
+            variable_item_set_current_value_text(app->ssid_item, "");                                // Initialize
+        }
+        if (!app->password_item)
+        {
+            app->password_item = variable_item_list_add(app->variable_item_list, "Password", 0, NULL, NULL); // index 1
+            variable_item_set_current_value_text(app->password_item, "");                                    // Initialize
+        }
+        if (settings_loaded)
+        {
+            variable_item_set_current_value_text(app->ssid_item, ssid);
+            // variable_item_set_current_value_text(app->password_item, password);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->ssid_item, ""); // Initialize
+                                                                      // variable_item_set_current_value_text(app->password_item, "Password"); // Initialize
+        }
+        // save for updating temp buffers later
+        save_char("ssid", ssid);
+        save_char("password", password);
+        // strncpy(app->temp_buffer_ssid, app->ssid, app->temp_buffer_size_ssid - 1);
+        // app->temp_buffer_ssid[app->temp_buffer_size_ssid - 1] = '\0';
+        // strncpy(app->temp_buffer_password, app->password, app->temp_buffer_size_password - 1);
+        // app->temp_buffer_password[app->temp_buffer_size_password - 1] = '\0';
+        break;
+    case WebCrawlerViewVariableItemListFile:
+        if (!easy_flipper_set_variable_item_list(&app->variable_item_list, WebCrawlerViewVariableItemList, web_crawler_file_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (!app->file_read_item)
+        {
+            app->file_read_item = variable_item_list_add(app->variable_item_list, "Read File", 0, NULL, NULL); // index 0
+            variable_item_set_current_value_text(app->file_read_item, "");                                     // Initialize
+        }
+        if (!app->file_type_item)
+        {
+            app->file_type_item = variable_item_list_add(app->variable_item_list, "Set File Type", 0, NULL, NULL); // index 1
+            variable_item_set_current_value_text(app->file_type_item, "");                                         // Initialize
+        }
+        if (!app->file_rename_item)
+        {
+            app->file_rename_item = variable_item_list_add(app->variable_item_list, "Rename File", 0, NULL, NULL); // index 2
+            variable_item_set_current_value_text(app->file_rename_item, "");                                       // Initialize
+        }
+        if (!app->file_delete_item)
+        {
+            app->file_delete_item = variable_item_list_add(app->variable_item_list, "Delete File", 0, NULL, NULL); // index 3
+            variable_item_set_current_value_text(app->file_delete_item, "");                                       // Initialize
+        }
+        if (settings_loaded)
+        {
+            variable_item_set_current_value_text(app->file_type_item, file_type);
+            variable_item_set_current_value_text(app->file_rename_item, file_rename);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->file_type_item, ".txt");            // Initialize
+            variable_item_set_current_value_text(app->file_rename_item, "received_data"); // Initialize
+        }
+        // save for updating temp buffers later
+        save_char("file_type", file_type);
+        save_char("file_rename", file_rename);
+        // strncpy(app->temp_buffer_file_type, app->file_type, app->temp_buffer_size_file_type - 1);
+        // app->temp_buffer_file_type[app->temp_buffer_size_file_type - 1] = '\0';
+        // strncpy(app->temp_buffer_file_rename, app->file_rename, app->temp_buffer_size_file_rename - 1);
+        // app->temp_buffer_file_rename[app->temp_buffer_size_file_rename - 1] = '\0';
+        break;
+    case WebCrawlerViewVariableItemListRequest:
+        if (!easy_flipper_set_variable_item_list(&app->variable_item_list, WebCrawlerViewVariableItemList, web_crawler_request_enter_callback, web_crawler_back_to_configure_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (!app->path_item)
+        {
+            app->path_item = variable_item_list_add(app->variable_item_list, "Path", 0, NULL, NULL);
+            variable_item_set_current_value_text(app->path_item, ""); // Initialize
+        }
+        if (!app->http_method_item)
+        {
+            app->http_method_item = variable_item_list_add(app->variable_item_list, "HTTP Method", 5, web_crawler_http_method_change, app);
+            variable_item_set_current_value_text(app->http_method_item, ""); // Initialize
+            variable_item_set_current_value_index(app->http_method_item, 0); // Initialize
+        }
+        if (!app->headers_item)
+        {
+            app->headers_item = variable_item_list_add(app->variable_item_list, "Headers", 0, NULL, NULL);
+            variable_item_set_current_value_text(app->headers_item, ""); // Initialize
+        }
+        if (!app->payload_item)
+        {
+            app->payload_item = variable_item_list_add(app->variable_item_list, "Payload", 0, NULL, NULL);
+            variable_item_set_current_value_text(app->payload_item, ""); // Initialize
+        }
+        //
+        //
+        if (settings_loaded)
+        {
+            variable_item_set_current_value_text(app->path_item, path);
+            variable_item_set_current_value_text(app->http_method_item, http_method);
+            variable_item_set_current_value_text(app->headers_item, headers);
+            variable_item_set_current_value_text(app->payload_item, payload);
+            //
+            variable_item_set_current_value_index(
+                app->http_method_item,
+                strstr(http_method, "GET") != NULL ? 0 : strstr(http_method, "POST") != NULL   ? 1
+                                                     : strstr(http_method, "PUT") != NULL      ? 2
+                                                     : strstr(http_method, "DELETE") != NULL   ? 3
+                                                     : strstr(http_method, "DOWNLOAD") != NULL ? 4
+                                                                                               : 0);
+        }
+        else
+        {
+            variable_item_set_current_value_text(app->path_item, "https://httpbin.org/get");                           // Initialize
+            variable_item_set_current_value_text(app->http_method_item, "GET");                                        // Initialize
+            variable_item_set_current_value_text(app->headers_item, "{\n\t\"Content-Type\": \"application/json\"\n}"); // Initialize
+            variable_item_set_current_value_text(app->payload_item, "{\n\t\"key\": \"value\"\n}");                     // Initialize
+        }
+        // save for updating temp buffers later
+        save_char("path", path);
+        save_char("http_method", http_method);
+        save_char("headers", headers);
+        save_char("payload", payload);
+        // strncpy(app->temp_buffer_path, app->path, app->temp_buffer_size_path - 1);
+        // app->temp_buffer_path[app->temp_buffer_size_path - 1] = '\0';
+        // strncpy(app->temp_buffer_http_method, app->http_method, app->temp_buffer_size_http_method - 1);
+        // app->temp_buffer_http_method[app->temp_buffer_size_http_method - 1] = '\0';
+        // strncpy(app->temp_buffer_headers, app->headers, app->temp_buffer_size_headers - 1);
+        // app->temp_buffer_headers[app->temp_buffer_size_headers - 1] = '\0';
+        // strncpy(app->temp_buffer_payload, app->payload, app->temp_buffer_size_payload - 1);
+        // app->temp_buffer_payload[app->temp_buffer_size_payload - 1] = '\0';
+        break;
+    default:
+        FURI_LOG_E(TAG, "Invalid view");
+        return false;
+    }
+    return true;
+}
+static void free_variable_item_list(WebCrawlerApp *app)
+{
+    furi_check(app, "free_variable_item_list: WebCrawlerApp is NULL");
+    if (app->variable_item_list)
+    {
+        view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
+        variable_item_list_free(app->variable_item_list);
+        app->variable_item_list = NULL;
+    }
+    // check and free variable items
+    if (app->ssid_item)
+    {
+        free(app->ssid_item);
+        app->ssid_item = NULL;
+    }
+    if (app->password_item)
+    {
+        free(app->password_item);
+        app->password_item = NULL;
+    }
+    if (app->file_type_item)
+    {
+        free(app->file_type_item);
+        app->file_type_item = NULL;
+    }
+    if (app->file_rename_item)
+    {
+        free(app->file_rename_item);
+        app->file_rename_item = NULL;
+    }
+    if (app->file_read_item)
+    {
+        free(app->file_read_item);
+        app->file_read_item = NULL;
+    }
+    if (app->file_delete_item)
+    {
+        free(app->file_delete_item);
+        app->file_delete_item = NULL;
+    }
+    if (app->path_item)
+    {
+        free(app->path_item);
+        app->path_item = NULL;
+    }
+    if (app->http_method_item)
+    {
+        free(app->http_method_item);
+        app->http_method_item = NULL;
+    }
+    if (app->headers_item)
+    {
+        free(app->headers_item);
+        app->headers_item = NULL;
+    }
+    if (app->payload_item)
+    {
+        free(app->payload_item);
+        app->payload_item = NULL;
+    }
+}
+static bool alloc_text_input(WebCrawlerApp *app, uint32_t view)
+{
+    furi_check(app, "alloc_text_input: WebCrawlerApp is NULL");
+    if (app->uart_text_input)
+    {
+        FURI_LOG_E(TAG, "Text Input already allocated");
+        return false;
+    }
+    switch (view)
+    {
+    case WebCrawlerViewTextInput:
+        app->temp_buffer_size_path = 128;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_path, app->temp_buffer_size_path) || !easy_flipper_set_buffer(&app->path, app->temp_buffer_size_path))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter URL", app->temp_buffer_path, app->temp_buffer_size_path, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("path", app->path, app->temp_buffer_size_path))
+        {
+            snprintf(app->temp_buffer_path, app->temp_buffer_size_path, "%s", app->path);
+        }
+        break;
+    case WebCrawlerViewTextInputSSID:
+        app->temp_buffer_size_ssid = 64;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_ssid, app->temp_buffer_size_ssid) || !easy_flipper_set_buffer(&app->ssid, app->temp_buffer_size_ssid))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter SSID", app->temp_buffer_ssid, app->temp_buffer_size_ssid, NULL, web_crawler_back_to_wifi_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("ssid", app->ssid, app->temp_buffer_size_ssid))
+        {
+            snprintf(app->temp_buffer_ssid, app->temp_buffer_size_ssid, "%s", app->ssid);
+        }
+        break;
+    case WebCrawlerViewTextInputPassword:
+        app->temp_buffer_size_password = 64;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_password, app->temp_buffer_size_password) || !easy_flipper_set_buffer(&app->password, app->temp_buffer_size_password))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter Password", app->temp_buffer_password, app->temp_buffer_size_password, NULL, web_crawler_back_to_wifi_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("password", app->password, app->temp_buffer_size_password))
+        {
+            snprintf(app->temp_buffer_password, app->temp_buffer_size_password, "%s", app->password);
+        }
+        break;
+    case WebCrawlerViewTextInputFileType:
+        app->temp_buffer_size_file_type = 16;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_file_type, app->temp_buffer_size_file_type) || !easy_flipper_set_buffer(&app->file_type, app->temp_buffer_size_file_type))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter File Type", app->temp_buffer_file_type, app->temp_buffer_size_file_type, NULL, web_crawler_back_to_file_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("file_type", app->file_type, app->temp_buffer_size_file_type))
+        {
+            snprintf(app->temp_buffer_file_type, app->temp_buffer_size_file_type, "%s", app->file_type);
+        }
+        break;
+    case WebCrawlerViewTextInputFileRename:
+        app->temp_buffer_size_file_rename = 128;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_file_rename, app->temp_buffer_size_file_rename) || !easy_flipper_set_buffer(&app->file_rename, app->temp_buffer_size_file_rename))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter File Rename", app->temp_buffer_file_rename, app->temp_buffer_size_file_rename, NULL, web_crawler_back_to_file_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("file_rename", app->file_rename, app->temp_buffer_size_file_rename))
+        {
+            snprintf(app->temp_buffer_file_rename, app->temp_buffer_size_file_rename, "%s", app->file_rename);
+        }
+        break;
+    case WebCrawlerViewTextInputHeaders:
+        app->temp_buffer_size_headers = 256;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_headers, app->temp_buffer_size_headers) || !easy_flipper_set_buffer(&app->headers, app->temp_buffer_size_headers))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter Headers", app->temp_buffer_headers, app->temp_buffer_size_headers, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("headers", app->headers, app->temp_buffer_size_headers))
+        {
+            snprintf(app->temp_buffer_headers, app->temp_buffer_size_headers, "%s", app->headers);
+        }
+        break;
+    case WebCrawlerViewTextInputPayload:
+        app->temp_buffer_size_payload = 256;
+        if (!easy_flipper_set_buffer(&app->temp_buffer_payload, app->temp_buffer_size_payload) || !easy_flipper_set_buffer(&app->payload, app->temp_buffer_size_payload))
+        {
+            return false;
+        }
+        if (!easy_flipper_set_uart_text_input(&app->uart_text_input, WebCrawlerViewInput, "Enter Payload", app->temp_buffer_payload, app->temp_buffer_size_payload, NULL, web_crawler_back_to_request_callback, &app->view_dispatcher, app))
+        {
+            return false;
+        }
+        if (load_char("payload", app->payload, app->temp_buffer_size_payload))
+        {
+            snprintf(app->temp_buffer_payload, app->temp_buffer_size_payload, "%s", app->payload);
+        }
+        break;
+    default:
+        FURI_LOG_E(TAG, "Invalid view");
+        return false;
+    }
+    return true;
+}
+static void free_text_input(WebCrawlerApp *app)
+{
+    furi_check(app, "free_text_input: WebCrawlerApp is NULL");
+    if (app->uart_text_input)
+    {
+        view_dispatcher_remove_view(app->view_dispatcher, WebCrawlerViewInput);
+        uart_text_input_free(app->uart_text_input);
+        app->uart_text_input = NULL;
+    }
+    // check and free path
+    if (app->temp_buffer_path)
+    {
+        free(app->temp_buffer_path);
+        app->temp_buffer_path = NULL;
+    }
+    if (app->path)
+    {
+        free(app->path);
+        app->path = NULL;
+    }
+    // check and free ssid
+    if (app->temp_buffer_ssid)
+    {
+        free(app->temp_buffer_ssid);
+        app->temp_buffer_ssid = NULL;
+    }
+    if (app->ssid)
+    {
+        free(app->ssid);
+        app->ssid = NULL;
+    }
+    // check and free password
+    if (app->temp_buffer_password)
+    {
+        free(app->temp_buffer_password);
+        app->temp_buffer_password = NULL;
+    }
+    if (app->password)
+    {
+        free(app->password);
+        app->password = NULL;
+    }
+    // check and free file type
+    if (app->temp_buffer_file_type)
+    {
+        free(app->temp_buffer_file_type);
+        app->temp_buffer_file_type = NULL;
+    }
+    if (app->file_type)
+    {
+        free(app->file_type);
+        app->file_type = NULL;
+    }
+    // check and free file rename
+    if (app->temp_buffer_file_rename)
+    {
+        free(app->temp_buffer_file_rename);
+        app->temp_buffer_file_rename = NULL;
+    }
+    if (app->file_rename)
+    {
+        free(app->file_rename);
+        app->file_rename = NULL;
+    }
+    // check and free headers
+    if (app->temp_buffer_headers)
+    {
+        free(app->temp_buffer_headers);
+        app->temp_buffer_headers = NULL;
+    }
+    if (app->headers)
+    {
+        free(app->headers);
+        app->headers = NULL;
+    }
+    // check and free payload
+    if (app->temp_buffer_payload)
+    {
+        free(app->temp_buffer_payload);
+        app->temp_buffer_payload = NULL;
+    }
+    if (app->payload)
+    {
+        free(app->payload);
+        app->payload = NULL;
+    }
+}
+
+void free_all(WebCrawlerApp *app)
+{
+    furi_check(app, "free_all: app is NULL");
+    free_widget(app);
+    free_submenu_config(app);
+    free_variable_item_list(app);
+    free_text_input(app);
+}
 static void web_crawler_draw_error(Canvas *canvas, DataLoaderModel *model)
 {
-    furi_check(model, "DataLoaderModel is NULL");
-    furi_check(model->fhttp, "FlipperHTTP is NULL");
+    furi_check(model, "web_crawler_draw_error: DataLoaderModel is NULL");
+    furi_check(model->fhttp, "web_crawler_draw_error: FlipperHTTP is NULL");
     furi_check(canvas, "Canvas is NULL");
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
@@ -71,45 +575,87 @@ static void web_crawler_draw_error(Canvas *canvas, DataLoaderModel *model)
     canvas_draw_str(canvas, 0, 20, "Press BACK to return.");
 }
 
+static void save_simply()
+{
+    char path[128];
+    char ssid[64];
+    char password[64];
+    char file_rename[128];
+    char file_type[16];
+    char http_method[16];
+    char headers[256];
+    char payload[256];
+
+    if (load_char("path", path, 128) &&
+        load_char("ssid", ssid, 64) &&
+        load_char("password", password, 64) &&
+        load_char("file_rename", file_rename, 128) &&
+        load_char("file_type", file_type, 16) &&
+        load_char("http_method", http_method, 16) &&
+        load_char("headers", headers, 256) &&
+        load_char("payload", payload, 256))
+    {
+        save_settings(path, ssid, password, file_rename, file_type, http_method, headers, payload);
+    }
+}
+
 void web_crawler_http_method_change(VariableItem *item)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)variable_item_get_context(item);
-    furi_check(app, "WebCrawlerApp is NULL");
+    furi_check(app, "web_crawler_http_method_change: WebCrawlerApp is NULL");
     uint8_t index = variable_item_get_current_value_index(item);
     variable_item_set_current_value_text(item, http_method_names[index]);
     variable_item_set_current_value_index(item, index);
 
     // save the http method
-    if (app)
-    {
-        strncpy(app->http_method, http_method_names[index], strlen(http_method_names[index]) + 1);
-
-        // save the settings
-        save_settings(
-            app->path,
-            app->ssid,
-            app->password,
-            app->file_rename,
-            app->file_type,
-            app->http_method,
-            app->headers,
-            app->payload);
-    }
+    save_char("http_method", http_method_names[index]);
+    save_simply();
 }
 
 static bool web_crawler_fetch(DataLoaderModel *model)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)model->parser_context;
-    furi_check(app, "WebCrawlerApp is NULL");
-    furi_check(model->fhttp, "FlipperHTTP is NULL");
-    if (app->file_type && app->file_rename)
+    furi_check(app, "web_crawler_fetch: WebCrawlerApp is NULL");
+    furi_check(model->fhttp, "web_crawler_fetch: FlipperHTTP is NULL");
+    char url[128];
+    if (!load_char("path", url, 128))
+    {
+        return false;
+    }
+    char file_type[16];
+    if (!load_char("file_type", file_type, 16))
+    {
+        return false;
+    }
+    char file_rename[128];
+    if (!load_char("file_rename", file_rename, 128))
+    {
+        return false;
+    }
+    char http_method[16];
+    if (!load_char("http_method", http_method, 16))
+    {
+        return false;
+    }
+    char headers[256];
+    if (!load_char("headers", headers, 256))
+    {
+        return false;
+    }
+    char payload[256];
+    if (!load_char("payload", payload, 256))
+    {
+        return false;
+    }
+
+    if (strlen(file_rename) > 0 && strlen(file_type) > 0)
     {
         snprintf(
             model->fhttp->file_path,
             sizeof(model->fhttp->file_path),
             STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/%s%s",
-            app->file_rename,
-            app->file_type);
+            file_rename,
+            file_type);
     }
     else
     {
@@ -119,44 +665,44 @@ static bool web_crawler_fetch(DataLoaderModel *model)
             STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/received_data.txt");
     }
 
-    if (strstr(app->http_method, "GET") != NULL)
+    if (strstr(http_method, "GET") != NULL)
     {
         model->fhttp->save_received_data = true;
         model->fhttp->is_bytes_request = false;
 
         // Perform GET request and handle the response
-        if (app->headers == NULL || app->headers[0] == '\0' || strstr(app->headers, " ") == NULL)
+        if (strlen(headers) == 0)
         {
-            return flipper_http_get_request(model->fhttp, app->path);
+            return flipper_http_get_request(model->fhttp, url);
         }
         else
         {
-            return flipper_http_get_request_with_headers(model->fhttp, app->path, app->headers);
+            return flipper_http_get_request_with_headers(model->fhttp, url, headers);
         }
     }
-    else if (strstr(app->http_method, "POST") != NULL)
+    else if (strstr(http_method, "POST") != NULL)
     {
         model->fhttp->save_received_data = true;
         model->fhttp->is_bytes_request = false;
 
         // Perform POST request and handle the response
-        return flipper_http_post_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
+        return flipper_http_post_request_with_headers(model->fhttp, url, headers, payload);
     }
-    else if (strstr(app->http_method, "PUT") != NULL)
+    else if (strstr(http_method, "PUT") != NULL)
     {
         model->fhttp->save_received_data = true;
         model->fhttp->is_bytes_request = false;
 
         // Perform PUT request and handle the response
-        return flipper_http_put_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
+        return flipper_http_put_request_with_headers(model->fhttp, url, headers, payload);
     }
-    else if (strstr(app->http_method, "DELETE") != NULL)
+    else if (strstr(http_method, "DELETE") != NULL)
     {
         model->fhttp->save_received_data = true;
         model->fhttp->is_bytes_request = false;
 
         // Perform DELETE request and handle the response
-        return flipper_http_delete_request_with_headers(model->fhttp, app->path, app->headers, app->payload);
+        return flipper_http_delete_request_with_headers(model->fhttp, url, headers, payload);
     }
     else
     {
@@ -164,7 +710,7 @@ static bool web_crawler_fetch(DataLoaderModel *model)
         model->fhttp->is_bytes_request = true;
 
         // Perform GET request and handle the response
-        return flipper_http_get_request_bytes(model->fhttp, app->path, app->headers);
+        return flipper_http_get_request_bytes(model->fhttp, url, headers);
     }
     return false;
 }
@@ -178,7 +724,7 @@ static char *web_crawler_parse(DataLoaderModel *model)
 
 static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
 {
-    furi_check(app, "WebCrawlerApp is NULL");
+    furi_check(app, "web_crawler_data_switch_to_view: WebCrawlerApp is NULL");
     char *title = "GET Request";
     if (strstr(app->http_method, "GET") != NULL)
     {
@@ -211,7 +757,7 @@ static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
 uint32_t web_crawler_back_to_configure_callback(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app, "WebCrawlerApp is NULL");
+    furi_check(app, "web_crawler_back_to_configure_callback: WebCrawlerApp is NULL");
     return WebCrawlerViewSubmenuConfig; // Return to the configure screen
 }
 
@@ -223,26 +769,26 @@ uint32_t web_crawler_back_to_configure_callback(void *context)
 uint32_t web_crawler_back_to_main_callback(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
-    furi_check(app, "WebCrawlerApp is NULL");
+    furi_check(app, "web_crawler_back_to_main_callback: WebCrawlerApp is NULL");
     return WebCrawlerViewSubmenuMain; // Return to the main submenu
 }
 
-uint32_t web_crawler_back_to_file_callback(void *context)
+static uint32_t web_crawler_back_to_file_callback(void *context)
 {
     UNUSED(context);
-    return WebCrawlerViewVariableItemListFile; // Return to the file submenu
+    return WebCrawlerViewVariableItemList; // Return to the file submenu
 }
 
 uint32_t web_crawler_back_to_wifi_callback(void *context)
 {
     UNUSED(context);
-    return WebCrawlerViewVariableItemListWifi; // Return to the wifi submenu
+    return WebCrawlerViewVariableItemList; // Return to the wifi submenu
 }
 
 uint32_t web_crawler_back_to_request_callback(void *context)
 {
     UNUSED(context);
-    return WebCrawlerViewVariableItemListRequest; // Return to the request submenu
+    return WebCrawlerViewVariableItemList; // Return to the request submenu
 }
 
 /**
@@ -273,19 +819,49 @@ void web_crawler_submenu_callback(void *context, uint32_t index)
             web_crawler_data_switch_to_view(app);
             break;
         case WebCrawlerSubmenuIndexAbout:
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewAbout);
+            free_all(app);
+            if (!alloc_widget(app, WebCrawlerViewAbout))
+            {
+                FURI_LOG_E(TAG, "Failed to allocate widget");
+                return;
+            }
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewWidget);
             break;
         case WebCrawlerSubmenuIndexConfig:
+            free_all(app);
+            if (!alloc_submenu_config(app))
+            {
+                FURI_LOG_E(TAG, "Failed to allocate submenu");
+                return;
+            }
             view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewSubmenuConfig);
             break;
         case WebCrawlerSubmenuIndexWifi:
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
+            free_variable_item_list(app);
+            if (!alloc_variable_item_list(app, WebCrawlerViewVariableItemListWifi))
+            {
+                FURI_LOG_E(TAG, "Failed to allocate variable item list");
+                return;
+            }
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
             break;
         case WebCrawlerSubmenuIndexRequest:
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+            free_variable_item_list(app);
+            if (!alloc_variable_item_list(app, WebCrawlerViewVariableItemListRequest))
+            {
+                FURI_LOG_E(TAG, "Failed to allocate variable item list");
+                return;
+            }
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
             break;
         case WebCrawlerSubmenuIndexFile:
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
+            free_variable_item_list(app);
+            if (!alloc_variable_item_list(app, WebCrawlerViewVariableItemListFile))
+            {
+                FURI_LOG_E(TAG, "Failed to allocate variable item list");
+                return;
+            }
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
             break;
         default:
             FURI_LOG_E(TAG, "Unknown submenu index");
@@ -301,12 +877,26 @@ void web_crawler_submenu_callback(void *context, uint32_t index)
  */
 void web_crawler_wifi_enter_callback(void *context, uint32_t index)
 {
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app, "web_crawler_wifi_enter_callback: WebCrawlerApp is NULL");
     switch (index)
     {
     case 0: // SSID
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputSSID))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_ssid_clicked(context, index);
         break;
     case 1: // Password
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputPassword))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_password_clicked(context, index);
         break;
     default:
@@ -322,15 +912,29 @@ void web_crawler_wifi_enter_callback(void *context, uint32_t index)
  */
 void web_crawler_file_enter_callback(void *context, uint32_t index)
 {
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app, "web_crawler_file_enter_callback: WebCrawlerApp is NULL");
     switch (index)
     {
     case 0: // File Read
         web_crawler_setting_item_file_read_clicked(context, index);
         break;
     case 1: // FIle Type
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputFileType))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_file_type_clicked(context, index);
         break;
     case 2: // File Rename
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputFileRename))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_file_rename_clicked(context, index);
         break;
     case 3: // File Delete
@@ -349,9 +953,17 @@ void web_crawler_file_enter_callback(void *context, uint32_t index)
  */
 void web_crawler_request_enter_callback(void *context, uint32_t index)
 {
+    WebCrawlerApp *app = (WebCrawlerApp *)context;
+    furi_check(app, "web_crawler_request_enter_callback: WebCrawlerApp is NULL");
     switch (index)
     {
     case 0: // URL
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInput))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_path_clicked(context, index);
         break;
     case 1:
@@ -359,10 +971,22 @@ void web_crawler_request_enter_callback(void *context, uint32_t index)
         break;
     case 2:
         // Headers
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputHeaders))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_headers_clicked(context, index);
         break;
     case 3:
         // Payload
+        free_text_input(app);
+        if (!alloc_text_input(app, WebCrawlerViewTextInputPayload))
+        {
+            FURI_LOG_E(TAG, "Failed to allocate text input");
+            return;
+        }
         web_crawler_setting_item_payload_clicked(context, index);
         break;
     default:
@@ -379,24 +1003,14 @@ void web_crawler_set_path_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->path || !app->temp_buffer_path || !app->temp_buffer_size_path || !app->path_item)
-    {
-        FURI_LOG_E(TAG, "Invalid path buffer");
-        return;
-    }
-    // Store the entered URL from temp_buffer_path to path
-    strncpy(app->path, app->temp_buffer_path, app->temp_buffer_size_path - 1);
-
+    snprintf(app->path, app->temp_buffer_size_path, "%s", app->temp_buffer_path);
     if (app->path_item)
     {
         variable_item_set_current_value_text(app->path_item, app->path);
-
-        // Save the URL to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
-
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+    save_char("path", app->temp_buffer_path);
+    save_simply();
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -407,24 +1021,14 @@ void web_crawler_set_headers_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->temp_buffer_headers || !app->temp_buffer_size_headers || !app->headers_item)
-    {
-        FURI_LOG_E(TAG, "Invalid headers buffer");
-        return;
-    }
-    // Store the entered headers from temp_buffer_headers to headers
-    strncpy(app->headers, app->temp_buffer_headers, app->temp_buffer_size_headers - 1);
-
+    snprintf(app->headers, app->temp_buffer_size_headers, "%s", app->temp_buffer_headers);
     if (app->headers_item)
     {
         variable_item_set_current_value_text(app->headers_item, app->headers);
-
-        // Save the headers to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
-
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+    save_char("headers", app->temp_buffer_headers);
+    save_simply();
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -435,24 +1039,14 @@ void web_crawler_set_payload_updated(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->temp_buffer_payload || !app->temp_buffer_size_payload || !app->payload_item)
-    {
-        FURI_LOG_E(TAG, "Invalid payload buffer");
-        return;
-    }
-    // Store the entered payload from temp_buffer_payload to payload
-    strncpy(app->payload, app->temp_buffer_payload, app->temp_buffer_size_payload - 1);
-
+    snprintf(app->payload, app->temp_buffer_size_payload, "%s", app->temp_buffer_payload);
     if (app->payload_item)
     {
         variable_item_set_current_value_text(app->payload_item, app->payload);
-
-        // Save the payload to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
-
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListRequest);
+    save_char("payload", app->temp_buffer_payload);
+    save_simply();
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -465,20 +1059,10 @@ void web_crawler_set_ssid_updated(void *context)
     furi_check(app, "WebCrawlerApp is NULL");
     FlipperHTTP *fhttp = flipper_http_alloc();
     furi_check(fhttp, "FlipperHTTP is NULL");
-    if (!app->temp_buffer_ssid || !app->temp_buffer_size_ssid || !app->ssid || !app->ssid_item)
-    {
-        FURI_LOG_E(TAG, "Invalid SSID buffer");
-        return;
-    }
-    // Store the entered SSID from temp_buffer_ssid to ssid
-    strncpy(app->ssid, app->temp_buffer_ssid, app->temp_buffer_size_ssid - 1);
-
+    snprintf(app->ssid, app->temp_buffer_size_ssid, "%s", app->temp_buffer_ssid);
     if (app->ssid_item)
     {
         variable_item_set_current_value_text(app->ssid_item, app->ssid);
-
-        // Save the SSID to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
         if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
@@ -487,9 +1071,10 @@ void web_crawler_set_ssid_updated(void *context)
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
     }
+    save_char("ssid", app->temp_buffer_ssid);
+    save_simply();
     flipper_http_free(fhttp);
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -502,20 +1087,10 @@ void web_crawler_set_password_update(void *context)
     furi_check(app, "WebCrawlerApp is NULL");
     FlipperHTTP *fhttp = flipper_http_alloc();
     furi_check(fhttp, "FlipperHTTP is NULL");
-    if (!app->temp_buffer_password || !app->temp_buffer_size_password || !app->password || !app->password_item)
-    {
-        FURI_LOG_E(TAG, "Invalid password buffer");
-        return;
-    }
-    // Store the entered Password from temp_buffer_password to password
-    strncpy(app->password, app->temp_buffer_password, app->temp_buffer_size_password - 1);
-
+    snprintf(app->password, app->temp_buffer_size_password, "%s", app->temp_buffer_password);
     if (app->password_item)
     {
         variable_item_set_current_value_text(app->password_item, app->password);
-
-        // Save the Password to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
 
         // send to UART
         if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
@@ -524,9 +1099,10 @@ void web_crawler_set_password_update(void *context)
             FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
         }
     }
+    save_char("password", app->temp_buffer_password);
+    save_simply();
     flipper_http_free(fhttp);
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListWifi);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -537,40 +1113,21 @@ void web_crawler_set_file_type_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->temp_buffer_file_type || !app->temp_buffer_size_file_type || !app->file_type || !app->file_type_item)
-    {
-        FURI_LOG_E(TAG, "Invalid file type buffer");
-        return;
-    }
-    // Temporary buffer to store the old name
-    char old_file_type[256];
-
-    strncpy(old_file_type, app->file_type, sizeof(old_file_type) - 1);
-    old_file_type[sizeof(old_file_type) - 1] = '\0'; // Null-terminate
-    strncpy(app->file_type, app->temp_buffer_file_type, app->temp_buffer_size_file_type - 1);
-
+    char old_file_type[16];
+    snprintf(old_file_type, sizeof(old_file_type), "%s", app->file_type);
+    snprintf(app->file_type, app->temp_buffer_size_file_type, "%s", app->temp_buffer_file_type);
     if (app->file_type_item)
     {
         variable_item_set_current_value_text(app->file_type_item, app->file_type);
-
-        // Save the File Type to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
-
-    rename_received_data(app->file_rename, app->file_rename, app->file_type, old_file_type);
-
-    // set the file path for fhttp->file_path
-    if (app->file_rename && app->file_type)
+    char file_rename[128];
+    if (load_char("file_rename", file_rename, 128))
     {
-        char file_path[256];
-        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
-        file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
-        // strncpy(fhttp->file_path, file_path, sizeof(fhttp->file_path) - 1);
-        // fhttp->file_path[sizeof(fhttp->file_path) - 1] = '\0'; // Null-terminate
+        rename_received_data(file_rename, file_rename, app->file_type, old_file_type);
     }
-
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
+    save_char("file_type", app->file_type);
+    save_simply();
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -581,44 +1138,17 @@ void web_crawler_set_file_rename_update(void *context)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->temp_buffer_file_rename || !app->temp_buffer_size_file_rename || !app->file_rename || !app->file_rename_item)
-    {
-        FURI_LOG_E(TAG, "Invalid file rename buffer");
-        return;
-    }
-
-    // Temporary buffer to store the old name
     char old_name[256];
-
-    // Ensure that app->file_rename is null-terminated
-    strncpy(old_name, app->file_rename, sizeof(old_name) - 1);
-    old_name[sizeof(old_name) - 1] = '\0'; // Null-terminate
-
-    // Store the entered File Rename from temp_buffer_file_rename to file_rename
-    strncpy(app->file_rename, app->temp_buffer_file_rename, app->temp_buffer_size_file_rename - 1);
-
+    snprintf(old_name, sizeof(old_name), "%s", app->file_rename);
+    snprintf(app->file_rename, app->temp_buffer_size_file_rename, "%s", app->temp_buffer_file_rename);
     if (app->file_rename_item)
     {
         variable_item_set_current_value_text(app->file_rename_item, app->file_rename);
-
-        // Save the File Rename to the settings
-        save_settings(app->path, app->ssid, app->password, app->file_rename, app->file_type, app->http_method, app->headers, app->payload);
     }
-
     rename_received_data(old_name, app->file_rename, app->file_type, app->file_type);
-
-    // set the file path for fhttp->file_path
-    if (app->file_rename && app->file_type)
-    {
-        char file_path[256];
-        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
-        file_path[sizeof(file_path) - 1] = '\0'; // Null-terminate
-        // strncpy(fhttp->file_path, file_path, sizeof(fhttp->file_path) - 1);
-        // fhttp->file_path[sizeof(fhttp->file_path) - 1] = '\0'; // Null-terminate
-    }
-
-    // Return to the Configure view
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemListFile);
+    save_char("file_rename", app->file_rename);
+    save_simply();
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewVariableItemList);
 }
 
 /**
@@ -630,7 +1160,7 @@ void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 {
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
-    if (!app->text_input_path)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -653,7 +1183,7 @@ void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_path,
+        app->uart_text_input,
         web_crawler_set_path_updated,
         app,
         app->temp_buffer_path,
@@ -662,11 +1192,11 @@ void web_crawler_setting_item_path_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_path),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_request_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInput);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -679,7 +1209,7 @@ void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_headers)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -710,7 +1240,7 @@ void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_headers,
+        app->uart_text_input,
         web_crawler_set_headers_updated,
         app,
         app->temp_buffer_headers,
@@ -719,11 +1249,11 @@ void web_crawler_setting_item_headers_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_headers),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_request_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputHeaders);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -736,7 +1266,7 @@ void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_payload)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -757,7 +1287,7 @@ void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_payload,
+        app->uart_text_input,
         web_crawler_set_payload_updated,
         app,
         app->temp_buffer_payload,
@@ -766,11 +1296,11 @@ void web_crawler_setting_item_payload_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_payload),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_request_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputPayload);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -783,7 +1313,7 @@ void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_ssid)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -804,7 +1334,7 @@ void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_ssid,
+        app->uart_text_input,
         web_crawler_set_ssid_updated,
         app,
         app->temp_buffer_ssid,
@@ -813,11 +1343,11 @@ void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_ssid),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputSSID);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -830,7 +1360,7 @@ void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_password)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -843,7 +1373,7 @@ void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_password,
+        app->uart_text_input,
         web_crawler_set_password_update,
         app,
         app->temp_buffer_password,
@@ -852,11 +1382,11 @@ void web_crawler_setting_item_password_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_password),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_wifi_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputPassword);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -869,7 +1399,7 @@ void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_file_type)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -890,7 +1420,7 @@ void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_file_type,
+        app->uart_text_input,
         web_crawler_set_file_type_update,
         app,
         app->temp_buffer_file_type,
@@ -899,11 +1429,11 @@ void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_file_type),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputFileType);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -916,7 +1446,7 @@ void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    if (!app->text_input_file_rename)
+    if (!app->uart_text_input)
     {
         FURI_LOG_E(TAG, "Text input is NULL");
         return;
@@ -937,7 +1467,7 @@ void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
     // Configure the text input
     bool clear_previous_text = false;
     uart_text_input_set_result_callback(
-        app->text_input_file_rename,
+        app->uart_text_input,
         web_crawler_set_file_rename_update,
         app,
         app->temp_buffer_file_rename,
@@ -946,11 +1476,11 @@ void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index)
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        uart_text_input_get_view(app->text_input_file_rename),
+        uart_text_input_get_view(app->uart_text_input),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewTextInputFileRename);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewInput);
 }
 
 /**
@@ -964,18 +1494,25 @@ void web_crawler_setting_item_file_delete_clicked(void *context, uint32_t index)
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
 
-    if (!delete_received_data(app))
+    free_widget(app);
+    if (!alloc_widget(app, WebCrawlerViewFileDelete))
+    {
+        FURI_LOG_E(TAG, "web_crawler_setting_item_file_delete_clicked: Failed to allocate widget");
+        return;
+    }
+
+    if (!delete_received_data())
     {
         FURI_LOG_E(TAG, "Failed to delete file");
     }
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        widget_get_view(app->widget_file_delete),
+        widget_get_view(app->widget),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileDelete);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewWidget);
 }
 
 void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
@@ -983,11 +1520,19 @@ void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     UNUSED(index);
-    widget_reset(app->widget_file_read);
-    char file_path[256];
-    if (app->file_rename && app->file_type)
+    free_widget(app);
+    if (!alloc_widget(app, WebCrawlerViewFileRead))
     {
-        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+        FURI_LOG_E(TAG, "web_crawler_setting_item_file_read_clicked: Failed to allocate widget");
+        return;
+    }
+    widget_reset(app->widget);
+    char file_path[256];
+    char file_rename[128];
+    char file_type[16];
+    if (load_char("file_rename", file_rename, 128) && load_char("file_type", file_type, 16))
+    {
+        snprintf(file_path, sizeof(file_path), "%s%s%s", RECEIVED_DATA_PATH, file_rename, file_type);
     }
     else
     {
@@ -999,28 +1544,28 @@ void web_crawler_setting_item_file_read_clicked(void *context, uint32_t index)
     if (received_data == NULL)
     {
         FURI_LOG_E(TAG, "Failed to load received data from file.");
-        if (app->widget_file_read)
+        if (app->widget)
         {
             widget_add_text_scroll_element(
-                app->widget_file_read,
+                app->widget,
                 0,
                 0,
                 128,
                 64, "File is empty.");
-            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
+            view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewWidget);
         }
         return;
     }
-    widget_add_text_scroll_element(app->widget_file_read, 0, 0, 128, 64, furi_string_get_cstr(received_data));
+    widget_add_text_scroll_element(app->widget, 0, 0, 128, 64, furi_string_get_cstr(received_data));
     furi_string_free(received_data);
 
     // Set the previous callback to return to Configure screen
     view_set_previous_callback(
-        widget_get_view(app->widget_file_read),
+        widget_get_view(app->widget),
         web_crawler_back_to_file_callback);
 
     // Show text input dialog
-    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewFileRead);
+    view_dispatcher_switch_to_view(app->view_dispatcher, WebCrawlerViewWidget);
 }
 
 static void web_crawler_widget_set_text(char *message, Widget **widget)

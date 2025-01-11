@@ -37,7 +37,7 @@ bool load_settings(
     size_t payload_size,
     WebCrawlerApp *app);
 
-bool delete_received_data(WebCrawlerApp *app);
+bool delete_received_data();
 bool rename_received_data(const char *old_name, const char *new_name, const char *file_type, const char *old_file_type);
 
 bool save_char(

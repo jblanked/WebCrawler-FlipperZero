@@ -4,6 +4,8 @@
 #include <flip_storage/web_crawler_storage.h>
 
 void web_crawler_http_method_change(VariableItem *item);
+uint32_t web_crawler_back_to_main_callback(void *context);
+void free_all(WebCrawlerApp *app);
 
 /**
  * @brief      Navigation callback to handle exiting from other views to the submenu.
@@ -11,14 +13,6 @@ void web_crawler_http_method_change(VariableItem *item);
  * @return     WebCrawlerViewSubmenu
  */
 uint32_t web_crawler_back_to_configure_callback(void *context);
-
-/**
- * @brief      Navigation callback to handle returning to the Wifi Settings screen.
- * @param      context   The context - WebCrawlerApp object.
- * @return     WebCrawlerViewSubmenu
- */
-uint32_t web_crawler_back_to_main_callback(void *context);
-uint32_t web_crawler_back_to_file_callback(void *context);
 
 uint32_t web_crawler_back_to_wifi_callback(void *context);
 
