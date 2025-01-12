@@ -712,22 +712,15 @@ static bool web_crawler_fetch(DataLoaderModel *model)
         model->fhttp->is_bytes_request = true;
 
         // Perform GET request and handle the response
-        return flipper_http_get_request_bytes(model->fhttp, url, headers);
+        return flipper_http_get_request_bytes(model->fhttp, url, "{\"Content-Type\": \"application/octet-stream\"}");
     }
     else // BROWSE
     {
-        model->fhttp->save_received_data = true;
-        model->fhttp->is_bytes_request = false;
+        model->fhttp->save_received_data = false;
+        model->fhttp->is_bytes_request = true;
 
-        // Perform GET request and handle the response
-        if (strlen(headers) == 0)
-        {
-            return flipper_http_get_request(model->fhttp, url);
-        }
-        else
-        {
-            return flipper_http_get_request_with_headers(model->fhttp, url, headers);
-        }
+        // download HTML response since the html could be large
+        return flipper_http_get_request_bytes(model->fhttp, url, "{\"Content-Type\": \"application/octet-stream\"}");
     }
     return false;
 }
@@ -751,14 +744,59 @@ static char *web_crawler_parse(DataLoaderModel *model)
             {
                 return "Failed to load HTML response.\nPress BACK to return.";
             }
-            if (!html_furi_tag_exists("<p>", returned_data, 0))
+
+            // head is mandatory,
+            bool head_exists = html_furi_tag_exists("<head>", returned_data, 0);
+            if (!head_exists)
             {
-                return "Failed to find <p> tag.\nPress BACK to return.";
+                return "Invalid HTML response.\nPress BACK to return.";
             }
-            // parse HTML response
-            FuriString *p_tags = html_furi_find_tags("<p>", returned_data);
+
+            // optional tags but we'll append them the response in order (title -> h1 -> h2 -> h3 -> p)
+            bool title_exists = html_furi_tag_exists("<title>", returned_data, 0);
+            bool h1_exists = html_furi_tag_exists("<h1>", returned_data, 0);
+            bool h2_exists = html_furi_tag_exists("<h2>", returned_data, 0);
+            bool h3_exists = html_furi_tag_exists("<h3>", returned_data, 0);
+            bool p_exists = html_furi_tag_exists("<p>", returned_data, 0);
+
+            FuriString *response = furi_string_alloc();
+            if (title_exists)
+            {
+                FuriString *title = html_furi_find_tag("<title>", returned_data, 0);
+                furi_string_cat_str(response, "Title: ");
+                furi_string_cat(response, title);
+                furi_string_cat_str(response, "\n\n");
+                furi_string_free(title);
+            }
+            if (h1_exists)
+            {
+                FuriString *h1 = html_furi_find_tag("<h1>", returned_data, 0);
+                furi_string_cat(response, h1);
+                furi_string_cat_str(response, "\n\n");
+                furi_string_free(h1);
+            }
+            if (h2_exists)
+            {
+                FuriString *h2 = html_furi_find_tag("<h2>", returned_data, 0);
+                furi_string_cat(response, h2);
+                furi_string_cat_str(response, "\n");
+                furi_string_free(h2);
+            }
+            if (h3_exists)
+            {
+                FuriString *h3 = html_furi_find_tag("<h3>", returned_data, 0);
+                furi_string_cat(response, h3);
+                furi_string_cat_str(response, "\n");
+                furi_string_free(h3);
+            }
+            if (p_exists)
+            {
+                FuriString *p = html_furi_find_tags("<p>", returned_data);
+                furi_string_cat(response, p);
+                furi_string_free(p);
+            }
             furi_string_free(returned_data);
-            return (char *)furi_string_get_cstr(p_tags);
+            return (char *)furi_string_get_cstr(response);
         }
     }
     return "Data saved to file.\nPress BACK to return.";

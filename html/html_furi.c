@@ -126,7 +126,7 @@ FuriString *html_furi_find_tag(const char *tag, FuriString *html, size_t index)
     FuriString *result = furi_string_alloc();
     furi_string_reserve(result, content_length + 1);
     furi_string_set_n(result, html, content_start, content_length);
-
+    furi_string_trim(result);
     return result;
 }
 
@@ -221,7 +221,7 @@ static FuriString *_html_furi_find_tag(const char *tag, FuriString *html, size_t
     FuriString *result = furi_string_alloc();
     furi_string_reserve(result, content_length + 1); // +1 for safety
     furi_string_set_n(result, html, content_start, content_length);
-
+    furi_string_trim(result);
     *out_next_index = i;
 
     return result;
@@ -248,6 +248,7 @@ FuriString *html_furi_find_tags(const char *tag, FuriString *html)
 
         // Append the found content
         furi_string_cat(result, parsed);
+        furi_string_cat_str(result, "\n");
         furi_string_free(parsed);
 
         // Resume searching at `next_index` (just after `</tag>`).
