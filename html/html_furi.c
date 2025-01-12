@@ -42,7 +42,7 @@ static bool furi_string_sub_equals(FuriString *str, int pos, const char *needle)
  * @return A newly allocated FuriString containing the parsed content,
  *         or an empty FuriString if the tag is not found.
  */
-FuriString *html_furi_parse(const char *tag, FuriString *html)
+FuriString *html_furi_parse(const char *tag, FuriString *html, size_t index)
 {
     int tag_len = strlen(tag);
 
@@ -72,7 +72,7 @@ FuriString *html_furi_parse(const char *tag, FuriString *html)
     // Locate the first occurrence of the opening tag.
     int html_len = furi_string_size(html);
     int open_tag_index = -1;
-    for (int i = 0; i <= html_len - tag_len; i++)
+    for (int i = index; i <= html_len - tag_len; i++)
     {
         if (furi_string_sub_equals(html, i, tag))
         {
