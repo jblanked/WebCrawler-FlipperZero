@@ -2,7 +2,7 @@
 - Updated the HTTP Method toggle to work as intended.
 - Updated FlipperHTTP to the latest version.
 - Improved memory allocation
-- Fixed loading diplay messages.
+- Fixed loading display messages.
 - Added a BROWSE method, which fetches HTML data from the specified path, parses the HTML, then displays the data as a "webpage". 
 
 ## 0.8
