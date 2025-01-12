@@ -256,3 +256,32 @@ FuriString *html_furi_find_tags(const char *tag, FuriString *html)
 
     return result;
 }
+
+/*
+ * @brief Check if an HTML tag exists in the provided HTML string.
+ * @param tag The HTML tag to search for (including the angle brackets).
+ * @param html The HTML string to search (as a FuriString).
+ * @param index The starting index to search from.
+ * @return True if the tag exists in the HTML string, false otherwise.
+ */
+bool html_furi_tag_exists(const char *tag, FuriString *html, size_t index)
+{
+    int tag_len = strlen(tag);
+    if (tag_len < 3)
+    {
+        FURI_LOG_E("html_furi_parse", "Invalid tag length");
+        return false;
+    }
+
+    int html_len = furi_string_size(html);
+
+    for (int i = index; i <= html_len - tag_len; i++)
+    {
+        if (furi_string_sub_equals(html, i, tag))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}

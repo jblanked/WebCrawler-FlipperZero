@@ -29,3 +29,12 @@ FuriString *html_furi_find_tag(const char *tag, FuriString *html, size_t index);
  *         or an empty FuriString if the tag is not found.
  */
 FuriString *html_furi_find_tags(const char *tag, FuriString *html);
+
+/*
+ * @brief Check if an HTML tag exists in the provided HTML string.
+ * @param tag The HTML tag to search for (including the angle brackets).
+ * @param html The HTML string to search (as a FuriString).
+ * @param index The starting index to search from.
+ * @return True if the tag exists in the HTML string, false otherwise.
+ */
+bool html_furi_tag_exists(const char *tag, FuriString *html, size_t index);

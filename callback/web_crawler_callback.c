@@ -751,13 +751,13 @@ static char *web_crawler_parse(DataLoaderModel *model)
             {
                 return "Failed to load HTML response.\nPress BACK to return.";
             }
-            // parse HTML response
-            FuriString *p_tags = html_furi_find_tags("<p>", returned_data);
-            furi_string_free(returned_data);
-            if (p_tags == NULL)
+            if (!html_furi_tag_exists("<p>", returned_data, 0))
             {
                 return "Failed to find <p> tag.\nPress BACK to return.";
             }
+            // parse HTML response
+            FuriString *p_tags = html_furi_find_tags("<p>", returned_data);
+            furi_string_free(returned_data);
             return (char *)furi_string_get_cstr(p_tags);
         }
     }
