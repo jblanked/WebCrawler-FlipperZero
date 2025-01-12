@@ -42,7 +42,7 @@ static bool furi_string_sub_equals(FuriString *str, int pos, const char *needle)
  * @return A newly allocated FuriString containing the parsed content,
  *         or an empty FuriString if the tag is not found.
  */
-FuriString *html_furi_parse(const char *tag, FuriString *html, size_t index)
+FuriString *html_furi_find_tag(const char *tag, FuriString *html, size_t index)
 {
     int tag_len = strlen(tag);
 
@@ -133,7 +133,7 @@ FuriString *html_furi_parse(const char *tag, FuriString *html, size_t index)
 
     // The content spans from content_start up to matching_close_index.
     size_t content_length = matching_close_index - content_start;
-    if (memmgr_get_free_heap() < (content_length + 1 + 1024)) // 1KB buffer
+    if (memmgr_get_free_heap() < (content_length + 1 + 4096)) // 4KB buffer
     {
         FURI_LOG_E("html_furi_parse", "Not enough heap to allocate result");
         return NULL;
@@ -144,5 +144,33 @@ FuriString *html_furi_parse(const char *tag, FuriString *html, size_t index)
     furi_string_reserve(result, content_length);
     furi_string_set_n(result, html, content_start, content_length);
 
+    return result;
+}
+
+/*
+ * @brief Parse all Furigana strings from an HTML tag, handling nested child tags.
+ * @param tag The HTML tag to parse (including the angle brackets).
+ * @param html The HTML string to parse (as a FuriString).
+ * @return A newly allocated FuriString containing the parsed content,
+ *         or an empty FuriString if the tag is not found.
+ */
+FuriString *html_furi_find_tags(const char *tag, FuriString *html)
+{
+    FuriString *result = furi_string_alloc();
+    size_t index = 0;
+    while (true)
+    {
+        FuriString *parsed = html_furi_find_tag(tag, html, index);
+        if (parsed == NULL)
+        {
+            break;
+        }
+        furi_string_cat(result, parsed);
+        furi_string_free(parsed);
+        // start after the strlen(tag)
+        // this is so we don't miss the inner tags
+        // I may change this to: index += furi_string_size(parsed)
+        index += strlen(tag);
+    }
     return result;
 }

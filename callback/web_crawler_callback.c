@@ -752,8 +752,8 @@ static char *web_crawler_parse(DataLoaderModel *model)
                 return "Failed to load HTML response.\nPress BACK to return.";
             }
             // parse HTML response
-            FuriString *h1_tag = html_furi_parse("<h1>", returned_data, 0);
-            FuriString *p_tag = html_furi_parse("<p>", returned_data, 0);
+            FuriString *h1_tag = html_furi_find_tag("<h1>", returned_data, 0);
+            FuriString *p_tag = html_furi_find_tag("<p>", returned_data, 0);
             furi_string_free(returned_data);
             if (p_tag == NULL && h1_tag == NULL)
             {
