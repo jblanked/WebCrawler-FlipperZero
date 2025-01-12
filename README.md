@@ -1,7 +1,7 @@
-Configure and manage HTTP requests directly from your Flipper Zero.
+Browse the web, fetch API data, and more on your Flipper Zero.
 
 ## Requirements
-- WiFi Developer Board, Raspberry Pi, or ESP32 device with the FlipperHTTP Flash: https://github.com/jblanked/FlipperHTTP
+- WiFi Developer Board, Raspberry Pi, or ESP32 device flashed with FlipperHTTP version 1.6 or higher: https://github.com/jblanked/FlipperHTTP
 - 2.4 GHz WiFi Access Point
 
 ## Installation
@@ -69,16 +69,5 @@ Configure and manage HTTP requests directly from your Flipper Zero.
 8. **Rename File**
    - Provide your desired file name. After saving, the app will rename your file with the new name.
 
-
-## Saving Settings
-After entering the desired configuration parameters, the app automatically saves these settings for use during the HTTP request process. You can update these settings at any time by navigating back to the **Settings** menu.
-
-## Logging and Debugging
-The Web Crawler app uses logging to help identify issues:
-
-- **Info Logs**: Provide general information about the app's operations (e.g., UART initialization, sending settings).
-- **Error Logs**: Indicate problems encountered during execution (e.g., failed to open settings file).
-
-Connect your Flipper Zero to a computer and use a serial terminal to view these logs for detailed troubleshooting.
 
 *Happy Crawling! 🕷️* 
