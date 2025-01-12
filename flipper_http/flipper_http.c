@@ -602,14 +602,14 @@ bool flipper_http_send_data(FlipperHTTP *fhttp, const char *data)
 
     // Create a buffer with data + '\n'
     size_t send_length = data_length + 1; // +1 for '\n'
-    if (send_length > 256)
+    if (send_length > 512)
     { // Ensure buffer size is sufficient
         FURI_LOG_E("FlipperHTTP", "Data too long to send over FHTTP->");
         return false;
     }
 
-    char send_buffer[257]; // 256 + 1 for safety
-    strncpy(send_buffer, data, 256);
+    char send_buffer[513]; // 512 + 1 for safety
+    strncpy(send_buffer, data, 512);
     send_buffer[data_length] = '\n';     // Append newline
     send_buffer[data_length + 1] = '\0'; // Null-terminate
 
@@ -1006,7 +1006,7 @@ bool flipper_http_get_request(FlipperHTTP *fhttp, const char *url)
     }
 
     // Prepare GET request command
-    char command[256];
+    char command[512];
     int ret = snprintf(command, sizeof(command), "[GET]%s", url);
     if (ret < 0 || ret >= (int)sizeof(command))
     {
@@ -1049,7 +1049,7 @@ bool flipper_http_get_request_with_headers(FlipperHTTP *fhttp, const char *url, 
     }
 
     // Prepare GET request command with headers
-    char command[256];
+    char command[512];
     int ret = snprintf(
         command, sizeof(command), "[GET/HTTP]{\"url\":\"%s\",\"headers\":%s}", url, headers);
     if (ret < 0 || ret >= (int)sizeof(command))
@@ -1092,7 +1092,7 @@ bool flipper_http_get_request_bytes(FlipperHTTP *fhttp, const char *url, const c
     }
 
     // Prepare GET request command with headers
-    char command[256];
+    char command[512];
     int ret = snprintf(
         command, sizeof(command), "[GET/BYTES]{\"url\":\"%s\",\"headers\":%s}", url, headers);
     if (ret < 0 || ret >= (int)sizeof(command))
@@ -1142,7 +1142,7 @@ bool flipper_http_post_request_with_headers(
     }
 
     // Prepare POST request command with headers and data
-    char command[256];
+    char command[512];
     int ret = snprintf(
         command,
         sizeof(command),
@@ -1192,7 +1192,7 @@ bool flipper_http_post_request_bytes(FlipperHTTP *fhttp, const char *url, const 
     }
 
     // Prepare POST request command with headers and data
-    char command[256];
+    char command[512];
     int ret = snprintf(
         command,
         sizeof(command),

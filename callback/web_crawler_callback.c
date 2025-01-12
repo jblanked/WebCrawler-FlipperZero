@@ -742,14 +742,15 @@ static char *web_crawler_parse(DataLoaderModel *model)
             FuriString *returned_data = flipper_http_load_from_file(model->fhttp->file_path);
             if (returned_data == NULL || furi_string_size(returned_data) == 0)
             {
-                return "Failed to load HTML response.\nPress BACK to return.";
+                return "Failed to load HTML response.\n\n\n\n\nPress BACK to return.";
             }
 
             // head is mandatory,
             bool head_exists = html_furi_tag_exists("<head>", returned_data, 0);
             if (!head_exists)
             {
-                return "Invalid HTML response.\nPress BACK to return.";
+                FURI_LOG_E(TAG, "Invalid HTML response");
+                return "Invalid HTML response.\n\n\n\n\nPress BACK to return.";
             }
 
             // optional tags but we'll append them the response in order (title -> h1 -> h2 -> h3 -> p)
@@ -796,10 +797,14 @@ static char *web_crawler_parse(DataLoaderModel *model)
                 furi_string_free(p);
             }
             furi_string_free(returned_data);
-            return (char *)furi_string_get_cstr(response);
+            if (response && furi_string_size(response) > 0)
+            {
+                return (char *)furi_string_get_cstr(response);
+            }
+            return "No HTML tags found.\nTry another URL...\n\n\n\nPress BACK to return.";
         }
     }
-    return "Data saved to file.\nPress BACK to return.";
+    return "Data saved to file.\n\n\n\n\nPress BACK to return.";
 }
 
 static void web_crawler_data_switch_to_view(WebCrawlerApp *app)
