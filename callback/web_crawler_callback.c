@@ -1169,17 +1169,26 @@ void web_crawler_set_ssid_updated(void *context)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     FlipperHTTP *fhttp = flipper_http_alloc();
-    furi_check(fhttp, "FlipperHTTP is NULL");
+    if (!fhttp)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate FlipperHTTP");
+        easy_flipper_dialog("[ERROR]", "Failed to allocate FlipperHTTP\nand save wifi settings");
+        return;
+    }
+    char password[64];
     snprintf(app->ssid, app->temp_buffer_size_ssid, "%s", app->temp_buffer_ssid);
     if (app->ssid_item)
     {
         variable_item_set_current_value_text(app->ssid_item, app->ssid);
 
-        // send to UART
-        if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
+        if (load_char("password", password, 64))
         {
-            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
-            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+            // send to UART
+            if (!flipper_http_save_wifi(fhttp, app->ssid, password))
+            {
+                FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
+                FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+            }
         }
     }
     save_char("ssid", app->temp_buffer_ssid);
@@ -1197,17 +1206,26 @@ void web_crawler_set_password_update(void *context)
     WebCrawlerApp *app = (WebCrawlerApp *)context;
     furi_check(app, "WebCrawlerApp is NULL");
     FlipperHTTP *fhttp = flipper_http_alloc();
-    furi_check(fhttp, "FlipperHTTP is NULL");
+    if (!fhttp)
+    {
+        FURI_LOG_E(TAG, "Failed to allocate FlipperHTTP");
+        easy_flipper_dialog("[ERROR]", "Failed to allocate FlipperHTTP\nand save wifi settings");
+        return;
+    }
+    char ssid[64];
     snprintf(app->password, app->temp_buffer_size_password, "%s", app->temp_buffer_password);
     if (app->password_item)
     {
         variable_item_set_current_value_text(app->password_item, app->password);
 
         // send to UART
-        if (!flipper_http_save_wifi(fhttp, app->ssid, app->password))
+        if (load_char("ssid", ssid, 64))
         {
-            FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
-            FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+            if (!flipper_http_save_wifi(fhttp, ssid, app->password))
+            {
+                FURI_LOG_E(TAG, "Failed to save wifi settings via UART");
+                FURI_LOG_E(TAG, "Make sure the Flipper is connected to the Wifi Dev Board");
+            }
         }
     }
     save_char("password", app->temp_buffer_password);
