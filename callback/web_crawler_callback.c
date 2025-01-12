@@ -1,5 +1,6 @@
 #include <callback/web_crawler_callback.h>
 #include <storage/storage.h>
+#include <html/html_furi.h>
 
 // Below added by Derek Jamison
 // FURI_LOG_DEV will log only during app development. Be sure that Settings/System/Log Device is "LPUART"; so we dont use serial port.
