@@ -1,5 +1,25 @@
 #include <easy_flipper/easy_flipper.h>
 
+void easy_flipper_dialog(
+    char *header,
+    char *text)
+{
+    DialogsApp *dialogs = furi_record_open(RECORD_DIALOGS);
+    DialogMessage *message = dialog_message_alloc();
+    dialog_message_set_header(
+        message, header, 64, 0, AlignCenter, AlignTop);
+    dialog_message_set_text(
+        message,
+        text,
+        0,
+        63,
+        AlignLeft,
+        AlignBottom);
+    dialog_message_show(dialogs, message);
+    dialog_message_free(message);
+    furi_record_close(RECORD_DIALOGS);
+}
+
 /**
  * @brief Navigation callback for exiting the application
  * @param context The context - unused
@@ -566,5 +586,41 @@ bool easy_flipper_set_char_to_furi_string(FuriString **furi_string, char *buffer
         return false;
     }
     furi_string_set_str(*furi_string, buffer);
+    return true;
+}
+
+bool easy_flipper_set_text_box(
+    TextBox **text_box,
+    int32_t view_id,
+    char *text,
+    bool start_at_end,
+    uint32_t(previous_callback)(void *),
+    ViewDispatcher **view_dispatcher)
+{
+    if (!text_box)
+    {
+        FURI_LOG_E(EASY_TAG, "Invalid arguments provided to set_text_box");
+        return false;
+    }
+    *text_box = text_box_alloc();
+    if (!*text_box)
+    {
+        FURI_LOG_E(EASY_TAG, "Failed to allocate TextBox");
+        return false;
+    }
+    if (text)
+    {
+        text_box_set_text(*text_box, text);
+    }
+    if (previous_callback)
+    {
+        view_set_previous_callback(text_box_get_view(*text_box), previous_callback);
+    }
+    text_box_set_font(*text_box, TextBoxFontText);
+    if (start_at_end)
+    {
+        text_box_set_focus(*text_box, TextBoxFocusEnd);
+    }
+    view_dispatcher_add_view(*view_dispatcher, view_id, text_box_get_view(*text_box));
     return true;
 }

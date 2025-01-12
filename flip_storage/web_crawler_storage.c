@@ -239,36 +239,17 @@ bool load_settings(
         return false;
     }
 
-    // set the path, ssid, and password
-    strncpy(app->path, path, path_size);
-    strncpy(app->ssid, ssid, ssid_size);
-    strncpy(app->password, password, password_size);
-    strncpy(app->file_rename, file_rename, file_rename_size);
-    strncpy(app->file_type, file_type, file_type_size);
-    strncpy(app->http_method, http_method, http_method_size);
-    strncpy(app->headers, headers, headers_size);
-    strncpy(app->payload, payload, payload_size);
-
     storage_file_close(file);
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
     return true;
 }
 
-bool delete_received_data(WebCrawlerApp *app)
+bool delete_received_data()
 {
-    if (app == NULL)
-    {
-        FURI_LOG_E(TAG, "WebCrawlerApp is NULL");
-        return false;
-    }
     // Open the storage record
     Storage *storage = furi_record_open(RECORD_STORAGE);
-    if (!storage)
-    {
-        FURI_LOG_E(TAG, "Failed to open storage record");
-        return false;
-    }
+    furi_check(storage, "Failed to open storage record");
 
     if (!storage_simply_remove_recursive(storage, RECEIVED_DATA_PATH "received_data.txt"))
     {
@@ -286,13 +267,19 @@ bool delete_received_data(WebCrawlerApp *app)
         return false;
     }
 
-    if (app->file_type == NULL || strlen(app->file_type) == 0)
+    char file_type[16];
+    if (!load_char("file_type", file_type, sizeof(file_type)))
     {
-        app->file_type = ".txt";
+        snprintf(file_type, sizeof(file_type), ".txt");
+    }
+    char file_rename[128];
+    if (!load_char("file_rename", file_rename, sizeof(file_rename)))
+    {
+        snprintf(file_rename, sizeof(file_rename), "received_data");
     }
 
     // Format the new_path
-    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, app->file_rename, app->file_type);
+    int ret_new = snprintf(new_path, 256, "%s%s%s", RECEIVED_DATA_PATH, file_rename, file_type);
     if (ret_new < 0 || (size_t)ret_new >= 256)
     {
         FURI_LOG_E(TAG, "Failed to create new_path");
@@ -387,4 +374,95 @@ bool rename_received_data(const char *old_name, const char *new_name, const char
         furi_record_close(RECORD_STORAGE);
         return renamed;
     }
+}
+
+bool save_char(
+    const char *path_name, const char *value)
+{
+    if (!value)
+    {
+        return false;
+    }
+    // Create the directory for saving settings
+    char directory_path[256];
+    snprintf(directory_path, sizeof(directory_path), STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/data");
+
+    // Create the directory
+    Storage *storage = furi_record_open(RECORD_STORAGE);
+    storage_common_mkdir(storage, directory_path);
+
+    // Open the settings file
+    File *file = storage_file_alloc(storage);
+    char file_path[256];
+    snprintf(file_path, sizeof(file_path), STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/data/%s.txt", path_name);
+
+    // Open the file in write mode
+    if (!storage_file_open(file, file_path, FSAM_WRITE, FSOM_CREATE_ALWAYS))
+    {
+        FURI_LOG_E(HTTP_TAG, "Failed to open file for writing: %s", file_path);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Write the data to the file
+    size_t data_size = strlen(value) + 1; // Include null terminator
+    if (storage_file_write(file, value, data_size) != data_size)
+    {
+        FURI_LOG_E(HTTP_TAG, "Failed to append data to file");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+    return true;
+}
+
+bool load_char(
+    const char *path_name,
+    char *value,
+    size_t value_size)
+{
+    if (!value)
+    {
+        return false;
+    }
+    Storage *storage = furi_record_open(RECORD_STORAGE);
+    File *file = storage_file_alloc(storage);
+
+    char file_path[256];
+    snprintf(file_path, sizeof(file_path), STORAGE_EXT_PATH_PREFIX "/apps_data/web_crawler/data/%s.txt", path_name);
+
+    // Open the file for reading
+    if (!storage_file_open(file, file_path, FSAM_READ, FSOM_OPEN_EXISTING))
+    {
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return NULL; // Return false if the file does not exist
+    }
+
+    // Read data into the buffer
+    size_t read_count = storage_file_read(file, value, value_size);
+    if (storage_file_get_error(file) != FSE_OK)
+    {
+        FURI_LOG_E(HTTP_TAG, "Error reading from file.");
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Ensure null-termination
+    value[read_count - 1] = '\0';
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+    return strlen(value) > 0;
 }

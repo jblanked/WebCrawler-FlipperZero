@@ -1,11 +1,8 @@
-## Overview
-
-**Web Crawler** is a custom application designed for the Flipper Zero device, allowing users to configure and manage HTTP requests directly from their Flipper Zero.
+Browse the web, fetch API data, and more on your Flipper Zero.
 
 ## Requirements
-- WiFi Dev Board or Raspberry Pi Pico W for Flipper Zero with FlipperHTTP Flash: https://github.com/jblanked/FlipperHTTP
-- WiFi Access Point
-
+- WiFi Developer Board, Raspberry Pi, or ESP32 device flashed with FlipperHTTP version 1.6 or higher: https://github.com/jblanked/FlipperHTTP
+- 2.4 GHz WiFi Access Point
 
 ## Installation
 - Download from the Official Flipper App Store: https://lab.flipper.net/apps/web_crawler
@@ -52,7 +49,7 @@
    - Enter the complete URL of the website you intend to crawl (e.g., https://www.example.com/).
 
 2. **HTTP Method**
-   - Choose between GET, POST, DELETE, PUT, and DOWNLOAD.
+   - Choose between GET, POST, DELETE, PUT, DOWNLOAD, and BROWSE.
 
 3. **Headers**
    - Add your required headers to be used in your HTTP requests
@@ -72,20 +69,5 @@
 8. **Rename File**
    - Provide your desired file name. After saving, the app will rename your file with the new name.
 
-
-## Saving Settings
-After entering the desired configuration parameters, the app automatically saves these settings for use during the HTTP request process. You can update these settings at any time by navigating back to the **Settings** menu.
-
-## Logging and Debugging
-The Web Crawler app uses logging to help identify issues:
-
-- **Info Logs**: Provide general information about the app's operations (e.g., UART initialization, sending settings).
-- **Error Logs**: Indicate problems encountered during execution (e.g., failed to open settings file).
-
-Connect your Flipper Zero to a computer and use a serial terminal to view these logs for detailed troubleshooting.
-
-## Known Issues
-1. **Screen Delay**: Occasionally, the Run screen may get stuck on "Receiving Data".
-   - If it takes longer than 10 seconds, restart your Flipper Zero.
 
 *Happy Crawling! 🕷️* 

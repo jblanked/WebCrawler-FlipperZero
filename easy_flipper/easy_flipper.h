@@ -8,6 +8,7 @@
 #include <gui/view.h>
 #include <gui/modules/submenu.h>
 #include <gui/view_dispatcher.h>
+#include <gui/elements.h>
 #include <gui/modules/menu.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/widget.h>
@@ -22,9 +23,14 @@
 #include <text_input/uart_text_input.h>
 #include <stdio.h>
 #include <string.h>
+#include <jsmn/jsmn_furi.h>
 #include <jsmn/jsmn.h>
 
 #define EASY_TAG "EasyFlipper"
+
+void easy_flipper_dialog(
+    char *header,
+    char *text);
 
 /**
  * @brief Navigation callback for exiting the application
@@ -260,5 +266,23 @@ bool easy_flipper_set_loading(
  * @return true if successful, false otherwise
  */
 bool easy_flipper_set_char_to_furi_string(FuriString **furi_string, char *buffer);
+
+/**
+ * @brief Initialize a TextBox object
+ * @param text_box The TextBox object to initialize
+ * @param view_id The ID/Index of the view
+ * @param text The text to display in the text box
+ * @param start_at_end Start the text box at the end
+ * @param previous_callback The previous callback function (can be set to NULL)
+ * @param view_dispatcher The ViewDispatcher object
+ * @return true if successful, false otherwise
+ */
+bool easy_flipper_set_text_box(
+    TextBox **text_box,
+    int32_t view_id,
+    char *text,
+    bool start_at_end,
+    uint32_t(previous_callback)(void *),
+    ViewDispatcher **view_dispatcher);
 
 #endif

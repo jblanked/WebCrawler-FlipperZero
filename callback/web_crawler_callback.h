@@ -3,11 +3,9 @@
 #include "web_crawler.h"
 #include <flip_storage/web_crawler_storage.h>
 
-extern bool sent_http_request;
-extern bool get_success;
-extern bool already_success;
-
 void web_crawler_http_method_change(VariableItem *item);
+uint32_t web_crawler_back_to_main_callback(void *context);
+void free_all(WebCrawlerApp *app);
 
 /**
  * @brief      Navigation callback to handle exiting from other views to the submenu.
@@ -15,14 +13,6 @@ void web_crawler_http_method_change(VariableItem *item);
  * @return     WebCrawlerViewSubmenu
  */
 uint32_t web_crawler_back_to_configure_callback(void *context);
-
-/**
- * @brief      Navigation callback to handle returning to the Wifi Settings screen.
- * @param      context   The context - WebCrawlerApp object.
- * @return     WebCrawlerViewSubmenu
- */
-uint32_t web_crawler_back_to_main_callback(void *context);
-uint32_t web_crawler_back_to_file_callback(void *context);
 
 uint32_t web_crawler_back_to_wifi_callback(void *context);
 
@@ -196,6 +186,7 @@ struct DataLoaderModel
     size_t request_count;
     ViewNavigationCallback back_callback;
     FuriTimer *timer;
+    FlipperHTTP *fhttp;
 };
 
 void web_crawler_generic_switch_to_view(WebCrawlerApp *app, char *title, DataLoaderFetch fetcher, DataLoaderParser parser, size_t request_count, ViewNavigationCallback back, uint32_t view_id);

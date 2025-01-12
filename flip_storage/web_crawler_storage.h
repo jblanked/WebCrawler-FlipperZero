@@ -1,5 +1,4 @@
-#ifndef WEB_CRAWLER_STORAGE_H
-#define WEB_CRAWLER_STORAGE_H
+#pragma once
 #include <web_crawler.h>
 #include <furi.h>
 #include <storage/storage.h>
@@ -38,6 +37,13 @@ bool load_settings(
     size_t payload_size,
     WebCrawlerApp *app);
 
-bool delete_received_data(WebCrawlerApp *app);
+bool delete_received_data();
 bool rename_received_data(const char *old_name, const char *new_name, const char *file_type, const char *old_file_type);
-#endif // WEB_CRAWLER_STORAGE_H
+
+bool save_char(
+    const char *path_name, const char *value);
+
+bool load_char(
+    const char *path_name,
+    char *value,
+    size_t value_size);
