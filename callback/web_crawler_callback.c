@@ -747,44 +747,18 @@ static char *web_crawler_parse(DataLoaderModel *model)
         {
             // parse HTML then return response
             FuriString *returned_data = flipper_http_load_from_file(model->fhttp->file_path);
-            if (returned_data == NULL)
+            if (returned_data == NULL || furi_string_size(returned_data) == 0)
             {
                 return "Failed to load HTML response.\nPress BACK to return.";
             }
             // parse HTML response
-            FuriString *h1_tag = html_furi_find_tag("<h1>", returned_data, 0);
-            FuriString *p_tag = html_furi_find_tag("<p>", returned_data, 0);
+            FuriString *p_tags = html_furi_find_tags("<p>", returned_data);
             furi_string_free(returned_data);
-            if (p_tag == NULL && h1_tag == NULL)
+            if (p_tags == NULL)
             {
-                return "Failed to find <h1> or <p> tag.\nPress BACK to return.";
+                return "Failed to find <p> tag.\nPress BACK to return.";
             }
-            else if (p_tag && h1_tag)
-            {
-                FuriString *combined = furi_string_alloc_printf("%s\n%s", furi_string_get_cstr(h1_tag), furi_string_get_cstr(p_tag));
-                if (combined)
-                {
-                    furi_string_free(h1_tag);
-                    furi_string_free(p_tag);
-                    return (char *)furi_string_get_cstr(combined);
-                }
-                else
-                {
-                    furi_string_free(h1_tag);
-                    furi_string_free(p_tag);
-                    return "Failed to combine <h1> and <p> tags.\nPress BACK to return.";
-                }
-            }
-            else if (h1_tag != NULL)
-            {
-                furi_string_free(p_tag);
-                return (char *)furi_string_get_cstr(h1_tag);
-            }
-            else if (p_tag != NULL)
-            {
-                furi_string_free(h1_tag);
-                return (char *)furi_string_get_cstr(p_tag);
-            }
+            return (char *)furi_string_get_cstr(p_tags);
         }
     }
     return "Data saved to file.\nPress BACK to return.";
