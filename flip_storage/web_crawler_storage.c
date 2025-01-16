@@ -445,7 +445,7 @@ bool load_char(
     {
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
-        return NULL; // Return false if the file does not exist
+        return false; // Return false if the file does not exist
     }
 
     // Read data into the buffer

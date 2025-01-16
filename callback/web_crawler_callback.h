@@ -96,55 +96,6 @@ void web_crawler_set_file_type_update(void *context);
 void web_crawler_set_file_rename_update(void *context);
 
 /**
- * @brief      Handler for Path configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_path_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for headers configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_headers_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for payload configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_payload_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for SSID configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_ssid_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for Password configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_password_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for File Type configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_file_type_clicked(void *context, uint32_t index);
-
-/**
- * @brief      Handler for File Rename configuration item click.
- * @param      context  The context - WebCrawlerApp object.
- * @param      index    The index of the item that was clicked.
- */
-void web_crawler_setting_item_file_rename_clicked(void *context, uint32_t index);
-
-/**
  * @brief      Handler for File Delete configuration item click.
  * @param      context  The context - WebCrawlerApp object.
  * @param      index    The index of the item that was clicked.

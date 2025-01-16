@@ -10,5 +10,5 @@ App(
     fap_description="Browse the web, fetch API data, and more.",
     fap_author="JBlanked",
     fap_weburl="https://github.com/jblanked/WebCrawler-FlipperZero",
-    fap_version = "1.0",
+    fap_version = "1.0.1",
 )

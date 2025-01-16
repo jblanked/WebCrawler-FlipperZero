@@ -1,3 +1,8 @@
+## 1.0.1
+- Updated the settings so they save as intended.
+- Added additional error handling.
+- Fixed a bug in the text input that prevented users from typing.
+
 ## 1.0
 - Updated the HTTP Method toggle to work as intended.
 - Updated FlipperHTTP to the latest version.

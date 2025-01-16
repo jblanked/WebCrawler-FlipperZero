@@ -8,7 +8,7 @@
 #include "web_crawler_icons.h"
 
 #define TAG "Web Crawler"
-#define VERSION_TAG TAG " v1.0"
+#define VERSION_TAG TAG " v1.0.1"
 extern char *http_method_names[];
 
 // Define the submenu items for our WebCrawler application
